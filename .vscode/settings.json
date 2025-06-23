@@ -1,0 +1,44 @@
+{
+    "files.associations": {
+        "target.h": "c",
+        "stm32f1xx_ll_usb.h": "c",
+        "stm32f1xx_hal_def.h": "c",
+        "usbd_cdc_if.h": "c",
+        "usb_device.h": "c",
+        "string.h": "c",
+        "stm32f103xb.h": "c",
+        "segger_rtt.h": "c",
+        "usart.h": "c",
+        "cmath": "cpp",
+        "complex": "cpp",
+        "application.hpp": "c",
+        "unordered_map": "cpp",
+        "fstream": "cpp",
+        "istream": "cpp",
+        "numeric": "cpp",
+        "sstream": "cpp",
+        "random": "cpp",
+        "future": "cpp",
+        "any": "cpp",
+        "coroutine": "cpp",
+        "memory": "cpp",
+        "memory_resource": "cpp",
+        "mutex": "cpp",
+        "optional": "cpp",
+        "ranges": "cpp",
+        "stdio.h": "c",
+        "multilateration.h": "c",
+        "format": "c",
+        "streambuf": "c",
+        "rover.c": "cpp"
+    },
+    "cortex-debug.sourceMap": {
+        "/build/arm-none-eabi-newlib/src/build-nano/arm-none-eabi/thumb/v7-m/nofp/newlib": "${workspaceFolder}",
+        "/build": "${workspaceFolder}"
+    },
+    "cortex-debug.searchDir": [
+        "${workspaceFolder}/Src",
+        "${workspaceFolder}/stm32-ioc/Core/Src",
+        "${workspaceFolder}/stm32-ioc/Drivers"
+    ]
+}

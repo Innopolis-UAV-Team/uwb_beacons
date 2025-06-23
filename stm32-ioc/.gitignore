@@ -1,0 +1,6 @@
+.settings/
+build/
+*.launch
+.vscode
+Tests/shell
+Src/Common/Inc/git_hash.h
