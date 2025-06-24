@@ -64,7 +64,8 @@ void usart_run() {
 
     HAL_StatusTypeDef res = HAL_UART_Transmit_IT(&huart1, message.data, message.len);
     if (res != HAL_OK) {
-        HAL_GPIO_TogglePin(GPIOA, LED3_Pin);
+        HAL_GPIO_TogglePin(GPIOA, LED1_Pin);
+        HAL_GPIO_WritePin(GPIOA, LED2_Pin, GPIO_PIN_RESET);
         return;
     }
 

@@ -15,6 +15,8 @@
 #include "../uart_logger/logger.hpp"
 #include "port.h"
 
+#define ANCHOR_IDS {0x01, 0x02, 0x03, 0x04}
+
 #ifdef ANCHOR
 #define APP_NAME "Anchor V1.0"
 #else
