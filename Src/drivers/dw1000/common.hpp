@@ -76,7 +76,6 @@ int DW1000::common_reset() {
 
     /* Configure DW1000. See NOTE 7 below. */
     dwt_configure(&dw_config);
-    // setup_cb();
 
     /* Apply default antenna delay value. See NOTE 1 below. */
     dwt_setrxantennadelay(RX_ANT_DLY);

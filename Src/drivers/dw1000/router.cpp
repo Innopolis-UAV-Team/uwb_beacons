@@ -51,7 +51,8 @@ static uint64_t final_rx_ts;
 
 static uint8_t rx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 0x00, 0x21, 0, 0};
 static uint8_t tx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 0x00, 'W', 'A', 0x10, 0x02, 0, 0, 0, 0};
-static uint8_t rx_final_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 0x00, 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8_t rx_final_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 0x00, 0x23, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 static void final_msg_get_ts(const uint8_t *ts_field, uint32_t *ts);
 
@@ -138,14 +139,16 @@ void DW1000::spin() {
                 dwt_writetxfctrl(sizeof(tx_resp_msg), 0, 1);          /* Zero offset in TX buffer, ranging. */
                 ret = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
 
-                /* If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one. See NOTE 11 below. */
+                /* If dwt_starttx() returns an error, abandon this ranging exchange
+                and proceed to the next one. See NOTE 11 below. */
                 if (ret == DWT_ERROR) {
                     logs("F\n");
                     continue;
                 }
 
                 /* Poll for reception of expected "final" frame or error/timeout. See NOTE 8 below. */
-                while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
+                while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) &
+                            (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {}
 
                 /* Increment frame sequence number after transmission of the response message (modulo 256). */
                 frame_seq_nb++;
@@ -204,21 +207,17 @@ void DW1000::spin() {
                         // log_data[i][3] = 0xFF;
                         // log_data[i][4] = 0;
                         // logc(log_data[i], 3);
-                    }
+                    } else {
 
                     /* Check that the frame is a poll sent by "anchor2".
-                     * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
-                    else
-                    {
+                        * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
                         /* Clear RX error/timeout events in the DW1000 status register. */
                         dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
                         /* Reset RX to properly reinitialise LDE operation. */
                         dwt_rxreset();
                     }
                 }
-            }
-            else
-            {
+            } else {
                 /* Clear RX error/timeout events in the DW1000 status register. */
                 dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
 
