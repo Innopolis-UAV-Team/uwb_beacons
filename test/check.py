@@ -1,7 +1,6 @@
-import binascii
 import serial
-import time
 import struct
+
 class Message:
     def __init__(self, data: bytes):
         self.id =  struct.unpack('B', data[0:1])[0]
@@ -43,8 +42,6 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
     except serial.SerialException as e:
         print(f"Serial exception: {e}")
 
-    # except Exception as e:
-    #     print(f"An error occurred: {e}")
     finally:
         # Close the serial connection
         ser.close()
@@ -52,5 +49,4 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
 
 # Example usage
 if __name__ == "__main__":
-    # Replace 'COM3' with the appropriate port for your environment
     check_ttl_serial(port='/dev/ttyUSB0', baudrate=230400)
