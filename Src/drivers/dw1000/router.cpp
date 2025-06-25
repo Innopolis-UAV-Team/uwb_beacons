@@ -42,9 +42,7 @@ reference so that it can be examined at a debug breakpoint. */
 static double tof;
 static double distance;
 
-/* String used to display measured distance on LCD screen (16 characters maximum). */
-char dist_str[sizeof(anchor_ids)][16] = {0};
-// uint8_t log_data[sizeof(anchor_ids)][5] = {0};
+uint8_t log_data[sizeof(anchor_ids)][5] = {0};
 static uint64_t poll_rx_ts;  // tx|rx changed, partially transfered
 static uint64_t resp_tx_ts;
 static uint64_t final_rx_ts;
@@ -198,17 +196,14 @@ void DW1000::spin() {
                         // distance = (90 * distance + 10 * anchor_distances[i]) / 100;
                         /* Display computed distance on LCD. */
                         anchor_distances[i] = distance;
-                        sprintf(dist_str[i], "%d %d.%d", int(anchor_ids[i]), int(distance), (int(distance*10)%10));
-                        logs(dist_str[i]);
-                        // uint16_t dist = uint16_t(int(distance * 100));
-                        // log_data[i][0] = anchor_ids[i];
-                        // log_data[i][1] = uint8_t(dist>>8);
-                        // log_data[i][2] = uint8_t(dist&0xFF);
-                        // log_data[i][3] = 0xFF;
-                        // log_data[i][4] = 0;
-                        // logc(log_data[i], 3);
+                        uint16_t dist = uint16_t(int(distance * 100));
+                        log_data[i][0] = anchor_ids[i];
+                        log_data[i][1] =  dist & 0xFF;
+                        log_data[i][2] = (dist >> 8) & 0xFF;
+                        log_data[i][3] = 0xFF;
+                        log_data[i][4] = 0;
+                        logc(log_data[i], 3);
                     } else {
-
                     /* Check that the frame is a poll sent by "anchor2".
                         * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
                         /* Clear RX error/timeout events in the DW1000 status register. */

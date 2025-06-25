@@ -1,6 +1,22 @@
 import binascii
 import serial
 import time
+import struct
+class Message:
+    def __init__(self, data: bytes):
+        self.id =  struct.unpack('B', data[0:1])[0]
+        self.data = 0
+        self.data = struct.unpack('<H', data[1:3])[0]  # '<H' denotes little-endian, uint16_t
+
+    def __str__(self):
+        return f"id: {self.id}, data: {self.data}"
+
+def decode(data: bytes) -> str:
+    # first byte is id
+    print(list(data))
+    data = data.split(b'\xFF\x00')
+    for d in data:
+        print(Message(d))
 
 def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
     """
@@ -13,39 +29,22 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
 
     try:
         # Initialize serial connection
-        ser = serial.Serial(port, baudrate, timeout=timeout, stopbits=serial.STOPBITS_ONE, bytesize=serial.SEVENBITS, parity="N")
+        ser = serial.Serial(port, baudrate, timeout=timeout, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, parity="E")
         print(f"Connected to {port} at {baudrate} baud.")
 
         # Test data to send
-        test_data = "Hello, TTL!"
-        # encodings = ['ascii', 'latin-1', 'utf-8', 'utf-16', 'utf-32']
-        # encodings = ['utf-16']
-        encodings = ['ascii']
-        i = 0
-        ser.write("Hello, TTL!".encode('ascii'))
-
         while True:
-            encoding = encodings[i % len(encodings)]
-
             # Try decoding with error handling
             if ser.in_waiting > 0:
                 response = ser.read_all()  # Read a line and strip newline characters
-                # print(f"Raw response: {binascii.hexlify(response)}")
-                try:
-                    message = response.decode(encoding)
-                    # message = response.decode(encoding).strip()
-                    print(f"Received message: {message}")
-                except UnicodeDecodeError as e:
-                    print(f"An error occurred: {e}")
-            i += 1
-
+                decode(response)
 
 
     except serial.SerialException as e:
         print(f"Serial exception: {e}")
 
-    except Exception as e:
-        print(f"An error occurred: {e}")
+    # except Exception as e:
+    #     print(f"An error occurred: {e}")
     finally:
         # Close the serial connection
         ser.close()
