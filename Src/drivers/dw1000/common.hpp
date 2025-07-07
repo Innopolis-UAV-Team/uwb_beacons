@@ -27,7 +27,7 @@ DW1000 dw1000;
 #define FINAL_MSG_RESP_RX_TS_IDX 14
 #define FINAL_MSG_FINAL_TX_TS_IDX 18
 #define FINAL_MSG_TS_LEN 4
-#define RNG_DELAY_MS 50
+#define RNG_DELAY_MS 10
 
 /* Default communication configuration. We use here EVK1000's default mode (mode 3). */
 dwt_config_t dw_config = {
@@ -76,7 +76,6 @@ int DW1000::common_reset() {
 
     /* Configure DW1000. See NOTE 7 below. */
     dwt_configure(&dw_config);
-    // setup_cb();
 
     /* Apply default antenna delay value. See NOTE 1 below. */
     dwt_setrxantennadelay(RX_ANT_DLY);

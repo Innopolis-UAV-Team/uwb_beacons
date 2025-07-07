@@ -27,6 +27,4 @@ struct BasicMessage {
 
 #define BASIC_MSG_PAYLOAD(msg) (&(msg)->payload[BASIC_MSG_SN_IDX + 1])
 
-inline void pack_basic_msg(Message* msg, BasicMessage* basic_msg) {
-
-}
+inline void pack_basic_msg(Message* msg, BasicMessage* basic_msg) {}

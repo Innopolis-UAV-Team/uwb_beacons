@@ -42,15 +42,15 @@ reference so that it can be examined at a debug breakpoint. */
 static double tof;
 static double distance;
 
-/* String used to display measured distance on LCD screen (16 characters maximum). */
-char dist_str[sizeof(anchor_ids)][16] = {0};
+uint8_t log_data[sizeof(anchor_ids)][5] = {0};
 static uint64_t poll_rx_ts;  // tx|rx changed, partially transfered
 static uint64_t resp_tx_ts;
 static uint64_t final_rx_ts;
 
 static uint8_t rx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 0x00, 0x21, 0, 0};
 static uint8_t tx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 0x00, 'W', 'A', 0x10, 0x02, 0, 0, 0, 0};
-static uint8_t rx_final_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 0x00, 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8_t rx_final_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 0x00, 0x23, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 static void final_msg_get_ts(const uint8_t *ts_field, uint32_t *ts);
 
@@ -117,7 +117,7 @@ void DW1000::spin() {
             tx_resp_msg[TX_ANCHOR_ID_IND] = anchor_ids[i];
             rx_final_msg[RX_ANCHOR_ID_IND] = anchor_ids[i];
             if (memcmp(rx_buffer, rx_poll_msg, ALL_MSG_COMMON_LEN) == 0) {
-                uint32 resp_tx_time;
+                uint32_t resp_tx_time;
                 int ret;
 
                 /* Retrieve poll reception timestamp. */
@@ -137,14 +137,16 @@ void DW1000::spin() {
                 dwt_writetxfctrl(sizeof(tx_resp_msg), 0, 1);          /* Zero offset in TX buffer, ranging. */
                 ret = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
 
-                /* If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one. See NOTE 11 below. */
+                /* If dwt_starttx() returns an error, abandon this ranging exchange
+                and proceed to the next one. See NOTE 11 below. */
                 if (ret == DWT_ERROR) {
                     logs("F\n");
                     continue;
                 }
 
                 /* Poll for reception of expected "final" frame or error/timeout. See NOTE 8 below. */
-                while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
+                while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) &
+                            (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {}
 
                 /* Increment frame sequence number after transmission of the response message (modulo 256). */
                 frame_seq_nb++;
@@ -163,10 +165,10 @@ void DW1000::spin() {
                      * As the sequence number field of the frame is not used in this example, it can be zeroed to ease the validation of the frame. */
                     rx_buffer[ALL_MSG_SN_IDX] = 0;
                     if (memcmp(rx_buffer, rx_final_msg, ALL_MSG_COMMON_LEN) == 0) {
-                        uint32 poll_tx_ts, resp_rx_ts, final_tx_ts;
-                        uint32 poll_rx_ts_32, resp_tx_ts_32, final_rx_ts_32;
+                        uint32_t poll_tx_ts, resp_rx_ts, final_tx_ts;
+                        uint32_t poll_rx_ts_32, resp_tx_ts_32, final_rx_ts_32;
                         double Ra, Rb, Da, Db;
-                        int64 tof_dtu;
+                        int64_t tof_dtu;
 
                         /* Retrieve response transmission and final reception timestamps. */
                         resp_tx_ts = get_tx_timestamp_u64();
@@ -178,9 +180,9 @@ void DW1000::spin() {
                         final_msg_get_ts(&rx_buffer[FINAL_MSG_FINAL_TX_TS_IDX], &final_tx_ts);
 
                         /* Compute time of flight. 32-bit subtractions give correct answers even if clock has wrapped. See NOTE 12 below. */
-                        poll_rx_ts_32 = (uint32)poll_rx_ts;
-                        resp_tx_ts_32 = (uint32)resp_tx_ts;
-                        final_rx_ts_32 = (uint32)final_rx_ts;
+                        poll_rx_ts_32 = (uint32_t)poll_rx_ts;
+                        resp_tx_ts_32 = (uint32_t)resp_tx_ts;
+                        final_rx_ts_32 = (uint32_t)final_rx_ts;
                         Ra = (double)(resp_rx_ts - poll_tx_ts);
                         Rb = (double)(final_rx_ts_32 - resp_tx_ts_32);
                         Da = (double)(final_tx_ts - resp_rx_ts);
@@ -188,30 +190,29 @@ void DW1000::spin() {
                         tof_dtu = (int64)((Ra * Rb - Da * Db) / (Ra + Rb + Da + Db));
                         tof = tof_dtu * DWT_TIME_UNITS;
                         distance = tof * SPEED_OF_LIGHT;
-                        if (distance < 0)
-                        {
+                        if (distance < 0) {
                             distance = anchor_distances[i];
                         }
                         // distance = (90 * distance + 10 * anchor_distances[i]) / 100;
                         /* Display computed distance on LCD. */
                         anchor_distances[i] = distance;
-                        sprintf(dist_str[i], "%d %d.%d", int(anchor_ids[i]), int(distance), (int(distance*10)%10));
-                        logs(dist_str[i]);
-                    }
-
+                        uint16_t dist = uint16_t(int(distance * 100));
+                        log_data[i][0] = anchor_ids[i];
+                        log_data[i][1] =  dist & 0xFF;
+                        log_data[i][2] = (dist >> 8) & 0xFF;
+                        log_data[i][3] = 0xFF;
+                        log_data[i][4] = 0;
+                        logc(log_data[i], 3);
+                    } else {
                     /* Check that the frame is a poll sent by "anchor2".
-                     * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
-                    else
-                    {
+                        * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
                         /* Clear RX error/timeout events in the DW1000 status register. */
                         dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
                         /* Reset RX to properly reinitialise LDE operation. */
                         dwt_rxreset();
                     }
                 }
-            }
-            else
-            {
+            } else {
                 /* Clear RX error/timeout events in the DW1000 status register. */
                 dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
 

@@ -4,7 +4,6 @@
  * Author: Anastasiia Stepanova <asiiapine@gmail.com>
 */
 
-#define ANCHOR_IDS {0x01, 0x02, 0x03, 0x04}
 
 #include "application.hpp"
 #include "drivers/dw1000/dw1000.hpp"

@@ -2,7 +2,6 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <target.h>
 
 void multilatteration(double anchor1x, double anchor1y, double anchor1z,
                          double anchor2x, double anchor2y, double anchor2z,

@@ -14,6 +14,10 @@ void logs(const char *s) {
     logger.log(s);
 }
 
+void logc(const uint8_t *s, uint16_t len) {
+    logger.log(s, len);
+}
+
 void Logger::init() {
     usart_init();
 }

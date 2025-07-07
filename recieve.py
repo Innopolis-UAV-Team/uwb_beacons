@@ -1,6 +1,6 @@
-import time
 import serial
 import struct
+import argparse
 
 class Message:
     def __init__(self, data: bytes):
@@ -13,12 +13,10 @@ class Message:
 
 def decode(data: bytes) -> str:
     # first byte is id
+    print(list(data))
     data = data.split(b'\xFF\x00')
-    i = 0
     for d in data:
         print(Message(d))
-        i += 1
-    return i
 
 def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
     """
@@ -33,19 +31,14 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
         # Initialize serial connection
         ser = serial.Serial(port, baudrate, timeout=timeout, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, parity="E")
         print(f"Connected to {port} at {baudrate} baud.")
-        n = 0
+
         # Test data to send
         while True:
             # Try decoding with error handling
             if ser.in_waiting > 0:
-                if (n == 0):
-                    last_message = time.time()
-
                 response = ser.read_all()  # Read a line and strip newline characters
-                n+=decode(response)
-                if (n > 100):
-                    print(f"Time: {time.time() - last_message}")
-                    n = 0
+                decode(response)
+
 
     except serial.SerialException as e:
         print(f"Serial exception: {e}")
@@ -57,4 +50,9 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
 
 # Example usage
 if __name__ == "__main__":
-    check_ttl_serial(port='/dev/ttyUSB0', baudrate=230400)
+    # get port and baudrate from command line arguments
+    parser = argparse.ArgumentParser(description='Receive data from the TTL to serial converter.')
+    parser.add_argument('--port', type=str, default='/dev/ttyUSB0', help='The serial port to which the TTL converter is connected (e.g., \'COM3\' on Windows or \'/dev/ttyUSB0\' on Linux).')
+    parser.add_argument('--baudrate', type=int, default=230400, help='The baud rate for communication. Default is 9600.')
+    args = parser.parse_args()
+    check_ttl_serial(port=args.port, baudrate=args.baudrate)

@@ -7,8 +7,10 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#include <stdint.h>
 
 void logs(const char *s);
+void logc(const uint8_t *s, uint16_t len);
 
 #ifdef __cplusplus
 }

@@ -17,7 +17,7 @@ if(USE_ANCHOR)
     )
 else()
     set(DW1000_SRCS
-        ${CMAKE_CURRENT_LIST_DIR}/rover.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/router.cpp
     )
 endif()
 
