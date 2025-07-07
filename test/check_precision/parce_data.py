@@ -1,9 +1,11 @@
 import os
-from typing import Dict, List, Tuple
+import time
+from typing import Dict, Iterable, List, Tuple
 
 from matplotlib import pyplot as plt
 import numpy as np
-
+import seaborn as sns
+from scipy.stats import norm
 
 def parse(string: str) -> Tuple[int, float]:
     """
@@ -115,7 +117,7 @@ def plot_distances(distances, title):
     # plt.show()
 
     fig, ax = plt.subplots()
-    results = {"Min": [], "Mean": [], "Std": []}
+    results = {"Min": [], "Mean": [], "Std": [], "Max": []}
     ids = list(distances.keys())
     bottom = np.zeros(len(ids))
 
@@ -124,7 +126,7 @@ def plot_distances(distances, title):
         results["Min"].append(np.min(dist))
         results["Mean"].append(np.mean(dist))
         results["Std"].append(np.std(dist))
-
+        results["Max"].append(np.max(dist))
 
     # Plot bars
     for name, data in results.items():
@@ -137,6 +139,42 @@ def plot_distances(distances, title):
     ax.legend()
     plt.show()
 
+def plot_distribution(data: dict, real_distance: float):
+    ids = list(data.keys())
+    fig, axs = plt.subplots(nrows=len(ids), ncols=1, figsize=(10, 10),tight_layout=True)
+    fig.suptitle("Single Anchor Test")
+    if not isinstance(axs, Iterable):
+        axs = [axs]
+    xmax = max([max(d) for d in data.values()])
+    xmin = min([min(d) for d in data.values()])
+    xmin = xmin - 0.1 * xmax
+    xmax += 0.1 * xmax
+    for i, id in enumerate(ids):
+        axs[i].set_title(f"id {id}")
+        dist_list = data[id]
+        mean = np.mean(dist_list)
+        std_dev = np.std(dist_list)
+
+        # Create a range of values for the x-axis
+        x = np.linspace(min(dist_list) - 3 * std_dev, max(dist_list) + 3 * std_dev, 1000)
+
+        # Calculate the normal distribution's y-values
+        y = norm.pdf(x, mean, std_dev)
+        sns.histplot(data[id], bins=100, color='green', label='values', ax=axs[i])
+        # Plot the normal distribution
+        axs[i].plot(x, y, label=f'Anchor {id} (μ={mean:.2f}, σ={std_dev:.2f})')
+        axs[i].axvline(x=real_distance, color='red', label='Real Distance')
+        # Fill the region within one standard deviation from the mean
+        axs[i].fill_between(x, y, where=((x > mean - std_dev) & (x < mean + std_dev)), 
+                        alpha=0.3, color='gray', label='Standard Deviation')
+        axs[i].set_xlabel('Distance, cm')
+        axs[i].set_ylabel('Probability Density')
+        axs[i].legend()
+        axs[i].grid()
+        axs[i].set_xlim([xmin, xmax])
+
+    time_str = time.strftime("%Y-%m-%d_%H-%M-%S")
+    fig.savefig(f"{data_dir}/figs/single_anchor_test_{real_distance}_{time_str}.png")
 
 if __name__ == '__main__':
     # list files in the current directory
@@ -148,8 +186,9 @@ if __name__ == '__main__':
 
     files = os.listdir(data_dir)
 
-    # distances = get_distances('data.txt')
     for file in files:
-        data = parse_file(os.path.join(data_dir, file))
-        plot_distances(data, file)
-
+        if (".txt" in file):
+            data = parse_file(os.path.join(data_dir, file))
+            real_distance = int(file.split('_')[0])
+            print(real_distance)
+            plot_distribution(data, real_distance)

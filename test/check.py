@@ -1,3 +1,4 @@
+import time
 import serial
 import struct
 
@@ -12,10 +13,12 @@ class Message:
 
 def decode(data: bytes) -> str:
     # first byte is id
-    print(list(data))
     data = data.split(b'\xFF\x00')
+    i = 0
     for d in data:
         print(Message(d))
+        i += 1
+    return i
 
 def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
     """
@@ -30,14 +33,19 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
         # Initialize serial connection
         ser = serial.Serial(port, baudrate, timeout=timeout, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, parity="E")
         print(f"Connected to {port} at {baudrate} baud.")
-
+        n = 0
         # Test data to send
         while True:
             # Try decoding with error handling
             if ser.in_waiting > 0:
-                response = ser.read_all()  # Read a line and strip newline characters
-                decode(response)
+                if (n == 0):
+                    last_message = time.time()
 
+                response = ser.read_all()  # Read a line and strip newline characters
+                n+=decode(response)
+                if (n > 100):
+                    print(f"Time: {time.time() - last_message}")
+                    n = 0
 
     except serial.SerialException as e:
         print(f"Serial exception: {e}")

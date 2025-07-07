@@ -60,7 +60,6 @@ def parse_files(directory: str) -> Dict:
         if id not in color_map:
             color_map[id] = (colors[len(color_map)], f"id {id}")
 
-    values = {'id': {'real': [], 'measured': []}}
     vals = []
 
     for file in files:
@@ -81,12 +80,9 @@ def parse_files(directory: str) -> Dict:
         plot_boxplot(ax=ax, distances=data, ids=id, color_map=color_map)
 
     labels = [x[1] for x in color_map.values()]
-    # legend1 = fig.legend(scatter_list, labels, loc='upper right')
-    # fig.add_artist(legend1)
-
+    plt.grid(axis='x')
     plt.xlabel("Real distance, m")
     plt.ylabel("Measured distance, m")
-    # plt.legend()
     plt.show()
     fig.savefig(f"{directory}/figs/single_anchor_test.png")
 
