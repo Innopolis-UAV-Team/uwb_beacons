@@ -5,123 +5,32 @@
     "version": "0.2.0",
     "configurations": [
     {
-        "cwd": "${workspaceFolder}",
-        "executable": "build/anchor/anchor",
-        "name": "anchor Debug with ST-Link",
-        "request": "launch",
-        "type": "cortex-debug",
-        "runToEntryPoint": "main",
-        "showDevDebugOutput": "raw",
-        "servertype": "stlink",
-        "postLaunchCommands": [
-            "monitor halt",
-            "info threads",
-            "directory ${workspaceFolder}/Src",
-            "directory ${workspaceFolder}/stm32-ioc/Core/Src",
-            "directory ${workspaceFolder}/stm32-ioc/Drivers"
-        ],
-        "postAttachCommands": [
-            "monitor halt",
-            "info threads",
-            "directory ${workspaceFolder}/Src",
-            "directory ${workspaceFolder}/stm32-ioc/Core/Src",
-            "directory ${workspaceFolder}/stm32-ioc/Drivers"
-        ],
-        "postRestartCommands": [
-            "monitor halt",
-            "info threads",
-            "directory ${workspaceFolder}/Src",
-            "directory ${workspaceFolder}/stm32-ioc/Core/Src",
-            "directory ${workspaceFolder}/stm32-ioc/Drivers"
-        ],
-        "sourceMap": {
-            "/build/arm-none-eabi-newlib/src/build-nano/arm-none-eabi/thumb/v7-m/nofp/newlib": "${workspaceFolder}",
-            "/build": "${workspaceFolder}"
-        },
-        "searchDir": [
-            "${workspaceFolder}/Src",
-            "${workspaceFolder}/stm32-ioc/Core/Src",
-            "${workspaceFolder}/stm32-ioc/Drivers"
-        ]
-    },
-    {
+        "name": "router Simple Cortex Debug",
         "cwd": "${workspaceFolder}",
         "executable": "build/router/router",
-        "name": "router Debug with ST-Link",
         "request": "launch",
         "type": "cortex-debug",
         "runToEntryPoint": "main",
         "showDevDebugOutput": "raw",
-        "servertype": "stlink",
-        "postLaunchCommands": [
-            "monitor halt",
-            "info threads",
-            "directory ${workspaceFolder}/Src",
-            "directory ${workspaceFolder}/stm32-ioc/Core/Src",
-            "directory ${workspaceFolder}/stm32-ioc/Drivers"
-        ],
-        "postAttachCommands": [
-            "monitor halt",
-            "info threads",
-            "directory ${workspaceFolder}/Src",
-            "directory ${workspaceFolder}/stm32-ioc/Core/Src",
-            "directory ${workspaceFolder}/stm32-ioc/Drivers"
-        ],
-        "postRestartCommands": [
-            "monitor halt",
-            "info threads",
-            "directory ${workspaceFolder}/Src",
-            "directory ${workspaceFolder}/stm32-ioc/Core/Src",
-            "directory ${workspaceFolder}/stm32-ioc/Drivers"
-        ],
-        "sourceMap": {
-            "/build/arm-none-eabi-newlib/src/build-nano/arm-none-eabi/thumb/v7-m/nofp/newlib": "${workspaceFolder}",
-            "/build": "${workspaceFolder}"
-        },
-        "searchDir": [
-            "${workspaceFolder}/Src",
-            "${workspaceFolder}/stm32-ioc/Core/Src",
-            "${workspaceFolder}/stm32-ioc/Drivers"
-        ]
+        "servertype": "openocd", // Or "jlink"
+        "configFiles": [
+                "interface/stlink.cfg", // Or your interface config
+                "target/stm32f1x.cfg"    // Or your target config
+            ],
     },
     {
-        "name": "Cortex Debug",
+        "name": "anchor Simple Cortex Debug",
         "cwd": "${workspaceFolder}",
         "executable": "build/anchor/anchor",
         "request": "launch",
         "type": "cortex-debug",
         "runToEntryPoint": "main",
-        "servertype": "jlink",
-        "postLaunchCommands": [
-            "monitor halt",
-            "info threads",
-            "directory ${workspaceFolder}/Src",
-            "directory ${workspaceFolder}/stm32-ioc/Core/Src",
-            "directory ${workspaceFolder}/stm32-ioc/Drivers"
-        ],
-        "postAttachCommands": [
-            "monitor halt",
-            "info threads",
-            "directory ${workspaceFolder}/Src",
-            "directory ${workspaceFolder}/stm32-ioc/Core/Src",
-            "directory ${workspaceFolder}/stm32-ioc/Drivers"
-        ],
-        "postRestartCommands": [
-            "monitor halt",
-            "info threads",
-            "directory ${workspaceFolder}/Src",
-            "directory ${workspaceFolder}/stm32-ioc/Core/Src",
-            "directory ${workspaceFolder}/stm32-ioc/Drivers"
-        ],
-        "sourceMap": {
-            "/build/arm-none-eabi-newlib/src/build-nano/arm-none-eabi/thumb/v7-m/nofp/newlib": "${workspaceFolder}",
-            "/build": "${workspaceFolder}"
-        },
-        "searchDir": [
-            "${workspaceFolder}/Src",
-            "${workspaceFolder}/stm32-ioc/Core/Src",
-            "${workspaceFolder}/stm32-ioc/Drivers"
-        ]
-    }
+        "showDevDebugOutput": "raw",
+        "servertype": "openocd", // Or "jlink"
+        "configFiles": [
+                "interface/stlink.cfg", // Or your interface config
+                "target/stm32f1x.cfg"    // Or your target config
+            ],
+    },
     ]
 }
