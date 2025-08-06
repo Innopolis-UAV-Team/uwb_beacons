@@ -9,7 +9,6 @@
 
 extern UART_HandleTypeDef huart1;
 
-#define UART_MAX_QUEUE_SIZE 20
 struct UART_Message {
     uint8_t* data;
     uint8_t len;

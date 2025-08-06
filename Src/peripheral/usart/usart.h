@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-#define UART_MAX_QUEUE_SIZE 20
+#define UART_MAX_QUEUE_SIZE 40
 
 typedef struct {
     uint8_t* data;

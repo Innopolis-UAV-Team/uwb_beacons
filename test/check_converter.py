@@ -25,7 +25,10 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = 1.0):
             # Read response
             if ser.in_waiting > 0:
                 response = ser.read(ser.in_waiting)
-
+                try:
+                    response = response.decode()
+                except UnicodeDecodeError:
+                    pass
                 print(f"Received: {response}")
             else:
                 print("No response received.")

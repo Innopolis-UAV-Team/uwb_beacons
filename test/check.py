@@ -11,14 +11,42 @@ class Message:
     def __str__(self):
         return f"id: {self.id}, data: {self.data}"
 
-def decode(data: bytes) -> str:
+def decode(data: bytes) -> int:
     # first byte is id
-    data = data.split(b'\xFF\x00')
+    msgs = data.split(b'\xFF\x00')
     i = 0
-    for d in data:
+    for d in msgs:
         print(Message(d))
         i += 1
     return i
+
+class CircularBuffer:
+    def __init__(self, size: int):
+        self.buffer = [b'\x00'for i in range(size)]
+        self.head = 0
+        self.size = 0
+        self.tail = 0
+
+    def append(self, item: bytes | None):
+        if item is None:
+            return
+        items = item.split(b'\xff\x00')
+        for item in items:
+            if len(item) == 0:
+                continue
+            self.buffer[self.head] = item
+            self.head = (self.head + 1) % len(self.buffer)
+            self.size += 1
+        if self.size > len(self.buffer):
+            self.size = len(self.buffer)
+
+    def pop(self):
+        if self.size == 0:
+            return None
+        item = self.parsed_buffer[self.tail]
+        self.tail = (self.tail + 1) % len(self.parsed_buffer)
+        self.size -= 1
+        return item
 
 def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
     """
@@ -35,21 +63,29 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
         print(f"Connected to {port} at {baudrate} baud.")
         n = 0
         # Test data to send
+        buffer: CircularBuffer = CircularBuffer(100)
         while True:
             # Try decoding with error handling
             if ser.in_waiting > 0:
-                if (n == 0):
-                    last_message = time.time()
-
-                response = ser.read_all()  # Read a line and strip newline characters
-                n+=decode(response)
-                if (n > 100):
-                    print(f"Time: {time.time() - last_message}")
-                    n = 0
-
+                try:
+                    response = ser.read_until(b'\xFF\x00')
+                    buffer.append(response)
+                    if buffer.size != 0:
+                        last_message = time.time()
+                    else :
+                        continue
+                    for i in range(buffer.size):
+                        msg = buffer.pop()
+                        print(Message(msg))
+                        n+=1
+                    if (n > 100):
+                        print(f"Time: {time.time() - last_message}")
+                        n = 0
+                except struct.error as e:
+                    print(e)
+                    print(response)
     except serial.SerialException as e:
         print(f"Serial exception: {e}")
-
     finally:
         # Close the serial connection
         ser.close()

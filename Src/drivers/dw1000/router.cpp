@@ -202,7 +202,7 @@ void DW1000::spin() {
                         log_data[i][2] = (dist >> 8) & 0xFF;
                         log_data[i][3] = 0xFF;
                         log_data[i][4] = 0;
-                        logc(log_data[i], 3);
+                        logc(log_data[i], 5);
                     } else {
                     /* Check that the frame is a poll sent by "anchor2".
                         * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
