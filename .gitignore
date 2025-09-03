@@ -5,3 +5,5 @@ venv
 .png
 test/*/data
 test/*/figs
+*.csv
+*.log

@@ -31,7 +31,6 @@ if __name__ == '__main__':
 
     messages: list[Message] = []
     for line in lines:
-        print(Message(line))
         messages.append(Message(line))
 
     # make directory for all output files
@@ -63,7 +62,6 @@ if __name__ == '__main__':
 
         with open(os.path.join(args.output, f"{id}.csv"), 'w') as f:
             print(f"Saving {len(messages_for_id)} messages for id {id}")
-            print(messages_for_id)
             df = pd.DataFrame(messages_for_id, columns=['id', 'distance'])
             df.to_csv(f, index=False)
         stats.append({

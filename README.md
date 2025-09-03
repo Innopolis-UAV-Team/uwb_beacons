@@ -59,6 +59,17 @@ python3 save_test_data.py --port /dev/ttyUSB0 --baudrate 460800 --real_distance 
 
 The script will save the data to a file in the `test/data` directory.
 
+Get statistics for the data:
+```bash
+python3 get_stats.py --input_file test/data/*.txt --output test/data/stats/ --real_values_file test/data/real_values.*
+```
+
+The script will save the statistics to a file in the `test/data/stats` directory and separate all anchors data to `id.csv` files, if the `--real_values_file` argument is provided, the real values will be saved to the file.
+The format of the statistics file is:
+
+| id | count | mean | min | max | std | median | real_value | error | error_pct |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 2442 | 536.3611793611793 | 31.0 | 635.0 | 23.25916398894732 | 536.5 | 500.0 | 36.361179361179325 | 7.272235872235864 |
 
 > [!NOTE]
 > The baudrate which is set by user in the software will be doubled because of some error in the hardware/clock configuration.
