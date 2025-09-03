@@ -1,6 +1,7 @@
 import time
 import serial
 import struct
+import argparse
 
 class Message:
     def __init__(self, data: bytes):
@@ -93,4 +94,9 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
 
 # Example usage
 if __name__ == "__main__":
-    check_ttl_serial(port='/dev/ttyUSB0', baudrate=460800)
+    argparser = argparse.ArgumentParser(description='Save data from the TTL to serial converter.')
+    argparser.add_argument('--port', type=str, default='/dev/ttyUSB0', help='The serial port to which the TTL converter is connected (e.g., \'COM3\' on Windows or \'/dev/ttyUSB0\' on Linux).')
+    argparser.add_argument('--baudrate', type=int, default=460800  , help='The baud rate for communication. Default is 9600.')
+
+    args = argparser.parse_args()
+    check_ttl_serial(port=args.port, baudrate=args.baudrate)
