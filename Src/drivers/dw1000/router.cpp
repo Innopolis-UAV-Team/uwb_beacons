@@ -220,16 +220,6 @@ void DW1000::spin() {
                 dwt_rxreset();
             }
         }
-        // logs(dist_str);
-        // multilatteration(
-        //     1.0, 1.0, 1.0,  // Anchor #1 cords
-        //     0.0, 1.0, 0.0,  // Anchor #2 cords
-        //     1.0, 0.0, 0.0,  // Anchor #3 cords
-        //     0.5, 0.5, 0.0,  // Anchor #4 cords
-        //     anchor_distances[0],  // Distance from Anchor #1
-        //     anchor_distances[1],  // Distance from Anchor #2
-        //     anchor_distances[2],  // Distance from Anchor #3
-        //     anchor_distances[3]);  // Distance from Anchor #4
     }
 }
 

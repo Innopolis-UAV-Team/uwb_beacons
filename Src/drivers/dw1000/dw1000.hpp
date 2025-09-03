@@ -23,13 +23,6 @@
 #define APP_NAME "Rover V1.0"
 #endif
 
-// #define ANCHOR_IDS {0x01, 0x02, 0x03, 0x04}
-// #endif
-
-// #ifndef ANCHOR_ID
-// #define ANCHOR_ID 0x01
-// #endif
-
 /* Buffer to store received messages.
  * Its size is adjusted to longest frame that this example code is supposed to handle. */
 #define RX_BUF_LEN 24
