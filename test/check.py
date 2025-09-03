@@ -43,8 +43,8 @@ class CircularBuffer:
     def pop(self):
         if self.size == 0:
             return None
-        item = self.parsed_buffer[self.tail]
-        self.tail = (self.tail + 1) % len(self.parsed_buffer)
+        item = self.buffer[self.tail]
+        self.tail = (self.tail + 1) % len(self.buffer)
         self.size -= 1
         return item
 
