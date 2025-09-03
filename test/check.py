@@ -93,4 +93,4 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
 
 # Example usage
 if __name__ == "__main__":
-    check_ttl_serial(port='/dev/ttyUSB0', baudrate=230400)
+    check_ttl_serial(port='/dev/ttyUSB0', baudrate=460800)
