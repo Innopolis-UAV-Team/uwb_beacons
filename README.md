@@ -48,13 +48,17 @@ in hex:
 Use the script to check if UART is working.
 
 ```bash
-python3 check.py --port /dev/ttyUSB0 --baudrate 230400
+python3 check.py --port /dev/ttyUSB0 --baudrate 460800
 ```
 
 There is a python script that parses the data and saves it to a file.
 
 ```bash
-python3 save_test_data.py --port /dev/ttyUSB0 --baudrate 230400 --real_distance 100
+python3 save_test_data.py --port /dev/ttyUSB0 --baudrate 460800 --real_distance 100
 ```
 
 The script will save the data to a file in the `test/data` directory.
+
+
+> [!NOTE]
+> The baudrate which is set by user in the software will be doubled because of some error in the hardware/clock configuration.
