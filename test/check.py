@@ -1,4 +1,7 @@
+import datetime
 import time
+from typing import Dict
+from numpy import mean
 import serial
 import struct
 import argparse
@@ -17,28 +20,56 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
         # Initialize serial connection
         ser = serial.Serial(port, baudrate, timeout=timeout, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, parity="E")
         print(f"Connected to {port} at {baudrate} baud.")
-        n = 0
         # Test data to send
         buffer: CircularBuffer = CircularBuffer(100)
+        ids: Dict[int, dict] = {}
+        last_message = time.time()
+
         while True:
             # Try decoding with error handling
             if ser.in_waiting > 0:
                 try:
                     response = ser.read_until(b'\xFF\x00')
                     buffer.append(response)
-                    if buffer.size != 0:
-                        last_message = time.time()
-                    else :
+                    if buffer.size == 0:
                         continue
                     for i in range(buffer.size):
                         msg = buffer.pop()
                         if msg is None:
                             continue
-                        print(Message(msg))
-                        n+=1
-                    if (n > 100):
+                        # print(Message(msg))
+                        message = Message(msg)
+                        if message.id not in ids:
+                            ids[message.id] = {}
+                            ids[message.id]['data'] = []
+                        if message.data is None:
+                            continue
+                        assert isinstance(message.data, int)
+                        ids[message.id]['data'].append(message.data)
+                        ids[message.id]['last_message'] = time.time()
+
+                    if time.time() - last_message < 1:
+                        last_message = time.time()
                         print(f"Time: {time.time() - last_message}")
-                        n = 0
+                        continue
+                    # all_messages_str = ""
+                    ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+                    row = {
+                        "ts": ts,
+                    }
+
+                    for id, data in ids.items():
+                        if time.time() - data['last_message'] > 1:
+                            data['data'] = []
+                            continue
+                        row[f"id{id}_count"] = str(len(data['data']))
+                        row[f"id{id}_mean"] = str(int(mean(data['data']))) if len(data['data']) > 0 else "N/A"
+                        ids[id]['data'] = []
+                    srting = ""
+                    for key, value in row.items():
+                        srting += f"{key}: {value}\t\t"
+                    print(srting)
                 except struct.error as e:
                     print(e)
                     print(response)
