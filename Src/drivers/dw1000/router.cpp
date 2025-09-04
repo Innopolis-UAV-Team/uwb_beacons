@@ -112,6 +112,10 @@ void DW1000::spin() {
 
         /* Check that the frame is a poll sent by which anchor.
          * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
+        static uint32_t last_transition_ms = 0;
+        if (HAL_GetTick() - last_transition_ms < RNG_DELAY_MS) {
+            return;
+        }
         for (uint8_t i = 0; i < sizeof(anchor_ids); i++) {
             rx_poll_msg[RX_ANCHOR_ID_IND] = anchor_ids[i];
             tx_resp_msg[TX_ANCHOR_ID_IND] = anchor_ids[i];
@@ -220,6 +224,7 @@ void DW1000::spin() {
                 dwt_rxreset();
             }
         }
+        last_transition_ms = HAL_GetTick();
     }
 }
 
