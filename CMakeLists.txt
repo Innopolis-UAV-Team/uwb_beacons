@@ -27,12 +27,14 @@ if (USE_ANCHOR)
 else()
     set(TARGET_NAME "router")
     add_definitions(-DROUTER)
-    if(NOT DEFINED BAUDRATE)
-        set(BAUDRATE "230400")  # default value
-    endif()
-    add_definitions(-DBAUDRATE=${BAUDRATE})
-    message(STATUS "Building for ROUTER with BAUDRATE=${BAUDRATE}")
 endif()
+
+if(NOT DEFINED BAUDRATE)
+    set(BAUDRATE "230400")  # default value
+endif()
+add_definitions(-DBAUDRATE=${BAUDRATE})
+
+message(STATUS "Building for ROUTER with BAUDRATE=${BAUDRATE}")
 
 set(stm32cubeMxProjectPath ${ROOT_DIR}/stm32-ioc)
 FILE(GLOB ldFile            ${stm32cubeMxProjectPath}/*_FLASH.ld)
