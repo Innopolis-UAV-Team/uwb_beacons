@@ -32,6 +32,8 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
                         continue
                     for i in range(buffer.size):
                         msg = buffer.pop()
+                        if msg is None:
+                            continue
                         print(Message(msg))
                         n+=1
                     if (n > 100):
@@ -42,6 +44,9 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
                     print(response)
     except serial.SerialException as e:
         print(f"Serial exception: {e}")
+    except OSError as e:
+        print(f"OS error: {e}")
+
     finally:
         # Close the serial connection
         ser.close()

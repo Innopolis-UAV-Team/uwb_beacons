@@ -10,8 +10,6 @@
 /* Define the global dw1000 object */
 DW1000 dw1000;
 
-extern IWDG_HandleTypeDef hiwdg;
-
 #define SPEED_OF_LIGHT 299702547
 
 #define UUS_TO_DWT_TIME 65536
