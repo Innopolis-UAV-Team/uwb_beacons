@@ -18,6 +18,8 @@ the enable of the receiver, as programmed for the DW1000's wait for response fea
 /* Receive response timeout. */
 #define RESP_RX_TIMEOUT_UUS 2700
 
+static uint32_t last_tx_ms = 0;
+
 static void final_msg_set_ts(uint8_t *ts_field, uint64_t ts);
 
 static uint64_t poll_tx_ts;
@@ -41,7 +43,13 @@ int DW1000::reset() {
 }
 
 void DW1000::spin() {
+    HAL_IWDG_Refresh(&hiwdg);
+
     static uint32_t last_transition_ms = 0;
+    if (HAL_GetTick() - last_tx_ms > 1000) {
+        last_tx_ms = HAL_GetTick();
+        logger.log("TX");
+    }
     if (HAL_GetTick() - last_transition_ms < RNG_DELAY_MS) {
         return;
     }
