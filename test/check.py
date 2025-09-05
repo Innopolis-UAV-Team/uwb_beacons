@@ -1,11 +1,44 @@
 import datetime
 import time
-from typing import Dict
+from typing import Dict, Tuple
 from numpy import mean
 import serial
 import struct
 import argparse
 from common.serial_messages import Message, CircularBuffer
+from common.algoritms import solve_position
+
+# Трилатерация по 3 якорям:
+#     A1=(0,0,0), A2=(L2,0,0), A3=(0,L3,0).
+L2 = 2000
+L3 = 2000
+idl2 = 6
+idl3 = 7
+idl1 = 2
+
+def trilateration(points: dict[int, dict[str, float]]) -> tuple[float, float, float] | None:
+    """
+    Trilateration using the three points.
+    :param points: Dictionary of points with id as key and distance as value.
+    :return: Dictionary of points with id as key and distance as value.
+    """
+    if points is None or len(points.keys()) < 3:
+        print(points.keys())
+        return None
+
+    for id in points.keys():
+        if points[id]['data'] == 0:
+            return None
+        if points[id]['data'] is None or len(points[id]['data']) == 0:
+            return None
+    ids = list(points.keys())
+    res: Tuple[float, float, float] = solve_position(d1=points[idl1]['data'][0],
+                   d2=points[idl2]['data'][0],
+                   d3=points[idl3]['data'][0],
+                   L2=L2,
+                   L3=L3)
+    print(f"Position: x={res[0]:.2f}\t\t y={res[1]:.2f}\t\t z={res[2]:.2f}")
+    return res
 
 def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
     """
@@ -54,20 +87,24 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
                     ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
                     row = {}
+                    res = trilateration(messages)
+
 
                     for id, data in messages.items():
                         if time.time() - data['last_message'] > 10:
                             data['data'] = []
                             continue
                         row[f"{id}_pts"] = str(len(data['data']))
-                        row[f"{id}_mean"] = str(int(mean(data['data']))) if len(data['data']) > 0 else "N/A"
+                        row[f"{id}_mean"] = str(int(mean(data['data']))) if len(data['data']) > 0 else 0
                         messages[id]['data'] = []
                     # sort the keys
                     keys = sorted(row.keys())
-                    srting = f"ts: {ts}\t"
+                    string = f"ts: {ts}\t\t"
+                    if res is not None:
+                        string += f"res: x={res[0]:.2f}\t y={res[1]:.2f}\t z={res[2]:.2f}\t\t"
                     for i, key in enumerate(keys):
-                        srting += f"{key}: {row[key]}\t"
-                    print(srting)
+                        string += f"{key}: {row[key]}\t\t"
+                    # print(string)
                 except struct.error as e:
                     print(e)
                     print("wrong format: ", response)
