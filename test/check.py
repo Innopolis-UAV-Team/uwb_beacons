@@ -1,6 +1,8 @@
 import datetime
 import time
+
 from typing import Dict, Tuple
+
 from numpy import mean
 import serial
 import struct
@@ -81,14 +83,15 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
                         messages[message.id]['last_message'] = time.time()
 
                     if time.time() - last_message < 0.2:
+
                         continue
                     last_message = time.time()
                     # all_messages_str = ""
                     ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
                     row = {}
-                    res = trilateration(messages)
 
+                    res = trilateration(messages)
 
                     for id, data in messages.items():
                         if time.time() - data['last_message'] > 10:
@@ -104,8 +107,8 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
                         string += f"res: x={res[0]:.2f}\t y={res[1]:.2f}\t z={res[2]:.2f}\t\t"
                     for i, key in enumerate(keys):
                         string += f"{key}: {row[key]}\t\t"
-                    # print(string)
-                except struct.error as e:
+                    print(srting)
+               except struct.error as e:
                     print(e)
                     print("wrong format: ", response)
     except serial.SerialException as e:
