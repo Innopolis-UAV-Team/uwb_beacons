@@ -3,15 +3,14 @@ import struct
 class Message:
     def __init__(self, data: bytes):
         self.id =  struct.unpack('B', data[0:1])[0]
-        self.data = 0
-        self.data = struct.unpack('<H', data[1:3])[0]  # '<H' denotes little-endian, uint16_t
+        self.data = struct.unpack('<I', data[1:5])[0]
 
     def __str__(self):
         return f"id: {self.id}, data: {self.data}"
 
 def decode(data: bytes) -> int:
     # first byte is id
-    msgs = data.split(b'\xFF\x00')
+    msgs = data.split(b'\xFF\xFF\xFF\x00')
     i = 0
     for d in msgs:
         print(Message(d))
@@ -28,7 +27,7 @@ class CircularBuffer:
     def append(self, item: bytes | None):
         if item is None:
             return
-        items = item.split(b'\xff\x00')
+        items = item.split(b'\xff\xff\xff\x00')
         for item in items:
             if len(item) == 0:
                 continue

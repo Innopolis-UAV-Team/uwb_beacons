@@ -29,7 +29,7 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
             # Try decoding with error handling
             if ser.in_waiting > 0:
                 try:
-                    response = ser.read_until(b'\xFF\x00')
+                    response = ser.read_until(b'\xFF\xFF\xFF\x00')
                     buffer.append(response)
                     if buffer.size == 0:
                         continue
@@ -37,7 +37,6 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
                         msg = buffer.pop()
                         if msg is None:
                             continue
-                        # print(Message(msg))
                         message = Message(msg)
                         if message.id not in messages:
                             messages[message.id] = {}
@@ -48,7 +47,7 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
                         messages[message.id]['data'].append(message.data)
                         messages[message.id]['last_message'] = time.time()
 
-                    if time.time() - last_message < 1:
+                    if time.time() - last_message < 0.2:
                         continue
                     last_message = time.time()
                     # all_messages_str = ""
@@ -71,7 +70,7 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
                     print(srting)
                 except struct.error as e:
                     print(e)
-                    print(response)
+                    print("wrong format: ", response)
     except serial.SerialException as e:
         print(f"Serial exception: {e}")
     except OSError as e:
