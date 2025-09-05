@@ -1,5 +1,4 @@
 id: 2, data: 6571
-id: 73, data: 542394702
 id: 2, data: 6233
 id: 2, data: 6533
 id: 2, data: 6439

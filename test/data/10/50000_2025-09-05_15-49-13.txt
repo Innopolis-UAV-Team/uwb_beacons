@@ -4,13 +4,7 @@ id: 2, data: 182
 id: 2, data: 164
 id: 2, data: 290
 id: 2, data: 182
-id: 70, data: 10093066
 id: 2, data: 220
-id: 70, data: 11928074
-id: 70, data: 18416138
-id: 70, data: 1175078410
-id: 70, data: 17170954
-id: 70, data: 1175078410
 id: 2, data: 281
 id: 2, data: 356
 id: 2, data: 314

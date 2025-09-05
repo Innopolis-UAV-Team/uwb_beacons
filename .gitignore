@@ -1,5 +1,4 @@
 build
-*.txt
 __pycache__
 venv
 .png
