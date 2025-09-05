@@ -9,6 +9,7 @@
 #include "dw1000.hpp"
 #include "common.hpp"
 #include "../uart_logger/logger.hpp"
+#include <cstdio>
 
 /* Initializing the anchorIDS */
 const uint8_t anchor_ids[] = ANCHOR_IDS;
@@ -42,7 +43,7 @@ reference so that it can be examined at a debug breakpoint. */
 static double tof;
 static double distance;
 
-uint8_t log_data[sizeof(anchor_ids)][5] = {0};
+uint8_t log_data[sizeof(anchor_ids)][9] = {0};
 static uint64_t poll_rx_ts;  // tx|rx changed, partially transfered
 static uint64_t resp_tx_ts;
 static uint64_t final_rx_ts;
@@ -200,13 +201,17 @@ void DW1000::spin() {
                         // distance = (90 * distance + 10 * anchor_distances[i]) / 100;
                         /* Display computed distance on LCD. */
                         anchor_distances[i] = distance;
-                        uint16_t dist = uint16_t(int(distance * 100));
+                        uint32_t dist = uint32_t(int(distance * 1000));
                         log_data[i][0] = anchor_ids[i];
                         log_data[i][1] =  dist & 0xFF;
                         log_data[i][2] = (dist >> 8) & 0xFF;
-                        log_data[i][3] = 0xFF;
-                        log_data[i][4] = 0;
-                        logc(log_data[i], 5);
+                        log_data[i][3] = (dist >> 16) & 0xFF;
+                        log_data[i][4] = (dist >> 24) & 0xFF;
+                        log_data[i][5] = 0xFF;
+                        log_data[i][6] = 0xFF;
+                        log_data[i][7] = 0xFF;
+                        log_data[i][8] = 0;
+                        logc(log_data[i], 9);
                     } else {
                     /* Check that the frame is a poll sent by "anchor2".
                         * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */

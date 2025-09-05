@@ -1,11 +1,46 @@
 import datetime
 import time
-from typing import Dict
+
+from typing import Dict, Tuple
+
 from numpy import mean
 import serial
 import struct
 import argparse
 from common.serial_messages import Message, CircularBuffer
+from common.algoritms import solve_position
+
+# Трилатерация по 3 якорям:
+#     A1=(0,0,0), A2=(L2,0,0), A3=(0,L3,0).
+L2 = 2000
+L3 = 2000
+idl2 = 6
+idl3 = 7
+idl1 = 2
+
+def trilateration(points: dict[int, dict[str, float]]) -> tuple[float, float, float] | None:
+    """
+    Trilateration using the three points.
+    :param points: Dictionary of points with id as key and distance as value.
+    :return: Dictionary of points with id as key and distance as value.
+    """
+    if points is None or len(points.keys()) < 3:
+        print(points.keys())
+        return None
+
+    for id in points.keys():
+        if points[id]['data'] == 0:
+            return None
+        if points[id]['data'] is None or len(points[id]['data']) == 0:
+            return None
+    ids = list(points.keys())
+    res: Tuple[float, float, float] = solve_position(d1=points[idl1]['data'][0],
+                   d2=points[idl2]['data'][0],
+                   d3=points[idl3]['data'][0],
+                   L2=L2,
+                   L3=L3)
+    print(f"Position: x={res[0]:.2f}\t\t y={res[1]:.2f}\t\t z={res[2]:.2f}")
+    return res
 
 def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
     """
@@ -29,7 +64,7 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
             # Try decoding with error handling
             if ser.in_waiting > 0:
                 try:
-                    response = ser.read_until(b'\xFF\x00')
+                    response = ser.read_until(b'\xFF\xFF\xFF\x00')
                     buffer.append(response)
                     if buffer.size == 0:
                         continue
@@ -37,7 +72,6 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
                         msg = buffer.pop()
                         if msg is None:
                             continue
-                        # print(Message(msg))
                         message = Message(msg)
                         if message.id not in messages:
                             messages[message.id] = {}
@@ -48,7 +82,8 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
                         messages[message.id]['data'].append(message.data)
                         messages[message.id]['last_message'] = time.time()
 
-                    if time.time() - last_message < 1:
+                    if time.time() - last_message < 0.2:
+
                         continue
                     last_message = time.time()
                     # all_messages_str = ""
@@ -56,22 +91,26 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
 
                     row = {}
 
+                    res = trilateration(messages)
+
                     for id, data in messages.items():
                         if time.time() - data['last_message'] > 10:
                             data['data'] = []
                             continue
                         row[f"{id}_pts"] = str(len(data['data']))
-                        row[f"{id}_mean"] = str(int(mean(data['data']))) if len(data['data']) > 0 else "N/A"
+                        row[f"{id}_mean"] = str(int(mean(data['data']))) if len(data['data']) > 0 else 0
                         messages[id]['data'] = []
                     # sort the keys
                     keys = sorted(row.keys())
-                    srting = f"ts: {ts}\t"
+                    string = f"ts: {ts}\t\t"
+                    if res is not None:
+                        string += f"res: x={res[0]:.2f}\t y={res[1]:.2f}\t z={res[2]:.2f}\t\t"
                     for i, key in enumerate(keys):
-                        srting += f"{key}: {row[key]}\t"
+                        string += f"{key}: {row[key]}\t\t"
                     print(srting)
-                except struct.error as e:
+               except struct.error as e:
                     print(e)
-                    print(response)
+                    print("wrong format: ", response)
     except serial.SerialException as e:
         print(f"Serial exception: {e}")
     except OSError as e:

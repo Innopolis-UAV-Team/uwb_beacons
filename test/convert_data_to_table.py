@@ -20,9 +20,9 @@ class Message:
 if __name__ == '__main__':
 
     argparser = argparse.ArgumentParser(description='Convert raw data file to table format.')
-    argparser.add_argument('--input', type=str, required=True, help='Input raw data file path.')
-    argparser.add_argument('--output', type=str, required=True, help='Output tables directory.')
-    argparser.add_argument('--real_values_file', type=str, help='File with real values for each id. Format: id,distance')
+    argparser.add_argument('-i', '--input', type=str, required=True, help='Input raw data file path.')
+    argparser.add_argument('-o', '--output', type=str, required=True, help='Output tables directory.')
+    argparser.add_argument('-r', '--real_values_file', type=str, help='File with real values for each id. Format: id,distance')
     args = argparser.parse_args()
 
     lines: list[str] = []
@@ -49,9 +49,9 @@ if __name__ == '__main__':
             lines = f.readlines()
 
         for line in lines:
-            id, distance = line.split(',')
-            id = int(id)
-            distance = float(distance)
+            id_str, distance_str = line.split(',')
+            id = int(id_str)
+            distance = float(distance_str)
             real_values[id] = distance
         print(f"Loaded real values for {len(real_values)} ids: {real_values}")
 

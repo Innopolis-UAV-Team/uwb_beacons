@@ -10,6 +10,7 @@
 /* Define the global dw1000 object */
 DW1000 dw1000;
 
+/* Speed of light in air, in metres per second. */
 #define SPEED_OF_LIGHT 299702547
 
 #define UUS_TO_DWT_TIME 65536
