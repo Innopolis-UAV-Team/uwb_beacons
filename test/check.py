@@ -1,14 +1,12 @@
 import datetime
 import time
-
 from typing import Dict, Tuple
-
 from numpy import mean
 import serial
 import struct
 import argparse
 from common.serial_messages import Message, CircularBuffer
-from common.algoritms import solve_position
+from common.algoritms import solve_position, multilateration
 from common.algoritms import calibrated_qubic,calibrated_quad
 
 # Трилатерация по 3 якорям:
@@ -29,7 +27,36 @@ a2 = -6.76197533e-05
 b2 = 6.43933686e-03  
 c2 = 4.33136513e-01
 
-def trilateration(points: dict[int, dict[str, float]]) -> tuple[float, float, float] | None:
+# Многолатерация по 3 якорям, можно добавить сколько угодно в формате id: (x, y, z)
+positions: dict[int, tuple[float, float, float]] = {
+    1: (0, 0, 0),
+    6: (L2, 0, 0),
+    7: (0, L3, 0),
+}
+
+def solve_multilateration(points: dict[int, dict[str, list[float]]]) -> tuple[float, float, float] | None:
+    """
+    Trilateration using the three points.
+    :param points: Dictionary of points with id as key and distance as value.
+    :return: Dictionary of points with id as key and distance as value.
+    """
+    try:
+        data: dict[int, float] = {}
+        for id in points.keys():
+            if points[id]['data'] is None or len(points[id]['data']) == 0:
+                continue
+            val = mean(points[id]['data'])
+            if not isinstance(val, float):
+                continue
+            data[id] = val
+        res: Tuple[float, float, float] =  multilateration(data, positions, z_sign=1)
+        print(f"Position: x={res[0]:.2f}\t\t y={res[1]:.2f}\t\t z={res[2]:.2f}")
+        return res
+    except ValueError as e:
+        return None
+
+
+def trilateration(points: dict[int, dict[str, list[float]]]) -> tuple[float, float, float] | None:
     """
     Trilateration using the three points.
     :param points: Dictionary of points with id as key and distance as value.
@@ -40,8 +67,6 @@ def trilateration(points: dict[int, dict[str, float]]) -> tuple[float, float, fl
         return None
 
     for id in points.keys():
-        if points[id]['data'] == 0:
-            return None
         if points[id]['data'] is None or len(points[id]['data']) == 0:
             return None
     ids = list(points.keys())
@@ -72,7 +97,7 @@ def trilateration(points: dict[int, dict[str, float]]) -> tuple[float, float, fl
     print(f"Position: x={res[0]:.2f}\t\t y={res[1]:.2f}\t\t z={res[2]:.2f}")
     return res
 
-def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
+def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float|None = None):
     """
     Check the functionality of a TTL to serial converter.
 
@@ -121,7 +146,8 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
 
                     row = {}
 
-                    res = trilateration(messages)
+                    res = solve_multilateration(messages)
+                    # res = trilateration(messages)
 
                     for id, data in messages.items():
                         if time.time() - data['last_message'] > 10:
@@ -147,7 +173,8 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
         print(f"Serial exception: {e}")
     except OSError as e:
         print(f"OS error: {e}")
-
+    except Exception as e:
+        print(f"An error occurred: {e}\n data: {response}")
     finally:
         # Close the serial connection
         ser.close()
