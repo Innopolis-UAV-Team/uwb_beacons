@@ -54,7 +54,7 @@ def connect_and_save(port: str, baudrate: int = 9600, timeout: float|None = None
                                     continue
                                 parsed_message = Message(msg)
                                 calibrated_distance = calibrated_qubic(a, b, c, d, parsed_message.data)
-                                f.write(str(Message(msg)) + 'calibrated: ' + str(calibrated_distance) + '\n')
+                                f.write(str(Message(msg)) + ' calibrated: ' + str(calibrated_distance) + '\n')
                             f.close()
                 except struct.error as e:
                     print(e)
