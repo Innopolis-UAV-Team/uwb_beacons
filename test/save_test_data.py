@@ -9,10 +9,15 @@ from common.serial_messages import Message, CircularBuffer, decode
 from common.algoritms import calibrated_qubic
 
 num_entries = 0
-a = 3.45936080e-05
-b = -2.47483248e-03
-c = 4.62066120e-02
-d = 1.93440057e-01
+#a = 3.45936080e-05
+#b = -2.47483248e-03
+#c = 4.62066120e-02
+#d = 1.93440057e-01
+
+a = 2.17754063e-07
+b = -6.50749910e-04  
+c = 2.60398686e-02
+d = 3.62156905e-01
 
 def connect_and_save(port: str, baudrate: int = 9600, timeout: float|None = None,
                         file_name: str = "output.txt", num_points: int = 1000):
@@ -53,7 +58,7 @@ def connect_and_save(port: str, baudrate: int = 9600, timeout: float|None = None
                                 if msg is None:
                                     continue
                                 parsed_message = Message(msg)
-                                calibrated_distance = calibrated_qubic(a, b, c, d, parsed_message.data)
+                                calibrated_distance = (parsed_message.data/1000.0 - calibrated_qubic(a, b, c, d, parsed_message.data/1000.0))*1000
                                 f.write(str(Message(msg)) + ' calibrated: ' + str(calibrated_distance) + '\n')
                             f.close()
                 except struct.error as e:

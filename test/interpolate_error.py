@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 # читаем файл
-df = pd.read_csv("results.txt", sep="\t")
+df = pd.read_csv("results0.txt", sep="\t")
 
 mean_m = df["mean_m"].values
 mean_error_m = df["mean_error_m"].values

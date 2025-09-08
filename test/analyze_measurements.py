@@ -23,10 +23,12 @@ def parse_number(s: str) -> float:
 
 def read_mm_values_from_txt(path: str):
     values_mm = []
+    #print(path)
     try:
         with open(path, "r", encoding="utf-8", errors="ignore") as f:
             for line in f:
                 m = DATA_PATTERN.search(line)
+                #print(m)
                 if m:
                     values_mm.append(int(m.group(1)))
     except Exception as e:
@@ -86,6 +88,7 @@ def main():
             continue
 
         mu, med, std, bias, n = stats
+        print(ref_m, mu)
         rows.append((ref_m, mu, med, std, bias, n))
 
     # Сохраняем результаты (TSV)

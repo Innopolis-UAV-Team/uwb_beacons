@@ -9,14 +9,25 @@ import struct
 import argparse
 from common.serial_messages import Message, CircularBuffer
 from common.algoritms import solve_position
+from common.algoritms import calibrated_qubic,calibrated_quad
 
 # Трилатерация по 3 якорям:
 #     A1=(0,0,0), A2=(L2,0,0), A3=(0,L3,0).
 L2 = 2000
 L3 = 2000
-idl2 = 6
-idl3 = 7
-idl1 = 2
+idl2 = 2 #  X
+idl3 = 6 #  Y
+idl1 = 4 #  0
+
+##CUBIC
+a = 2.17754063e-07
+b = -6.50749910e-04  
+c = 2.60398686e-02
+d = 3.62156905e-01
+##QUAD
+a2 = -6.76197533e-05  
+b2 = 6.43933686e-03  
+c2 = 4.33136513e-01
 
 def trilateration(points: dict[int, dict[str, float]]) -> tuple[float, float, float] | None:
     """
@@ -34,11 +45,30 @@ def trilateration(points: dict[int, dict[str, float]]) -> tuple[float, float, fl
         if points[id]['data'] is None or len(points[id]['data']) == 0:
             return None
     ids = list(points.keys())
-    res: Tuple[float, float, float] = solve_position(d1=points[idl1]['data'][0],
-                   d2=points[idl2]['data'][0],
-                   d3=points[idl3]['data'][0],
+
+    center = points[idl1]['data'][0]
+    #center = center - (center/1000.0 - calibrated_qubic(a, b, c, d, center/1000.0))*1000
+    center = (center/1000.0 - calibrated_quad(a2, b2, c2, center/1000.0))*1000
+    
+    xxx = points[idl2]['data'][0]
+    #xxx = xxx - (xxx/1000.0 - calibrated_qubic(a, b, c, d, xxx/1000.0))*1000
+    xxx = (xxx/1000.0 - calibrated_quad(a2, b2, c2, xxx/1000.0))*1000
+
+    yyy = points[idl3]['data'][0]
+    #yyy = yyy - (yyy/1000.0 - calibrated_qubic(a, b, c, d, yyy/1000.0))*1000
+    yyy = (yyy/1000.0 - calibrated_quad(a2, b2, c2, yyy/1000.0))*1000
+    
+    res: Tuple[float, float, float] = solve_position(d1=center,
+                   d2=xxx,
+                   d3=yyy,
                    L2=L2,
                    L3=L3)
+    
+    #res: Tuple[float, float, float] = solve_position(d1=points[idl1]['data'][0],
+    #               d2=points[idl2]['data'][0],
+    #               d3=points[idl3]['data'][0],
+    #               L2=L2,
+    #               L3=L3)
     print(f"Position: x={res[0]:.2f}\t\t y={res[1]:.2f}\t\t z={res[2]:.2f}")
     return res
 
@@ -98,16 +128,18 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
                             data['data'] = []
                             continue
                         row[f"{id}_pts"] = str(len(data['data']))
-                        row[f"{id}_mean"] = str(int(mean(data['data']))) if len(data['data']) > 0 else 0
+                        row[f"{id}_mean"] = int(mean(data['data'])) if len(data['data']) > 0 else 0
+                        #row[f"{id}_cor"] = round((row[f"{id}_mean"]/1000.0 - calibrated_qubic(a, b, c, d, row[f"{id}_mean"]/1000.0))*1000)
+                        row[f"{id}_cor"] = round((row[f"{id}_mean"]/1000.0 - calibrated_quad(a2, b2, c2, row[f"{id}_mean"]/1000.0))*1000)
                         messages[id]['data'] = []
                     # sort the keys
                     keys = sorted(row.keys())
-                    string = f"ts: {ts}\t\t"
+                    string = f"ts: {ts} "
                     if res is not None:
-                        string += f"res: x={res[0]:.2f}\t y={res[1]:.2f}\t z={res[2]:.2f}\t\t"
+                        string += f"res: x={res[0]:.2f} y={res[1]:.2f} z={res[2]:.2f} "
                     for i, key in enumerate(keys):
-                        string += f"{key}: {row[key]}\t\t"
-                    print(string)
+                        string += f"{key}: {row[key]}\t"
+                    #print(string)
                 except struct.error as e:
                     print(e)
                     print("wrong format: ", response)
@@ -125,7 +157,7 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser(description='Save data from the TTL to serial converter.')
     argparser.add_argument('-p', '--port', type=str, default='/dev/ttyUSB0', help='The serial port to which the TTL converter is connected (e.g., \'COM3\' on Windows or \'/dev/ttyUSB0\' on Linux).')
-    argparser.add_argument('-b', '--baudrate', type=int, default=460800  , help='The baud rate for communication. Default is 9600.')
+    argparser.add_argument('-b', '--baudrate', type=int, default=230400  , help='The baud rate for communication. Default is 9600.')
 
     args = argparser.parse_args()
     check_ttl_serial(port=args.port, baudrate=args.baudrate)
