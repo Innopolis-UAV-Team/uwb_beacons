@@ -108,7 +108,7 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
                     for i, key in enumerate(keys):
                         string += f"{key}: {row[key]}\t\t"
                     print(srting)
-               except struct.error as e:
+                except struct.error as e:
                     print(e)
                     print("wrong format: ", response)
     except serial.SerialException as e:
