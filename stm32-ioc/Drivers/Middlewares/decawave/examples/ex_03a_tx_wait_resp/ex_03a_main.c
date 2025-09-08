@@ -18,10 +18,10 @@
 #ifdef EX_03A_DEF
 #include "deca_device_api.h"
 #include "deca_regs.h"
-#include "lcd.h"
+// #include "lcd.h"
 #include "deca_spi.h"
 #include "port.h"
-
+#include "main.h"
 /* Example application name and version to display on LCD screen. */
 #define APP_NAME "TX WAITRESP v1.2"
 
@@ -75,7 +75,8 @@ static uint16 frame_len = 0;
 int dw_main(void)
 {
     /* Display application name on LCD. */
-    lcd_display_str(APP_NAME);
+    // lcd_display_str(APP_NAME);
+    printf(APP_NAME "\n");
 
     /* Reset and initialise DW1000. See NOTE 5 below.
      * For initialisation, DW1000 clocks must be temporarily set to crystal speed. After initialisation SPI rate can be increased for optimum
@@ -84,7 +85,8 @@ int dw_main(void)
     port_set_dw1000_slowrate();
     if (dwt_initialise(DWT_LOADNONE) == DWT_ERROR)
     {
-        lcd_display_str("INIT FAILED");
+        // lcd_display_str("INIT FAILED");
+        printf("INIT FAILED\n");
         while (1)
         { };
     }
@@ -158,10 +160,10 @@ int dw_main(void)
  *
  * 1. The device ID is a hard coded constant in the blink to keep the example simple but for a real product every device should have a unique ID.
  *    For development purposes it is possible to generate a DW1000 unique ID by combining the Lot ID & Part Number values programmed into the
- *    DW1000 during its manufacture. However there is no guarantee this will not conflict with someone else’s implementation. We recommended that
+ *    DW1000 during its manufacture. However there is no guarantee this will not conflict with someone elseï¿½s implementation. We recommended that
  *    customers buy a block of addresses from the IEEE Registration Authority for their production items. See "EUI" in the DW1000 User Manual.
  * 2. TX to RX delay can be set to 0 to activate reception immediately after transmission. But, on the responder side, it takes time to process the
- *    received frame and generate the response (this has been measured experimentally to be around 70 µs). Using an RX to TX delay slightly less than
+ *    received frame and generate the response (this has been measured experimentally to be around 70 ï¿½s). Using an RX to TX delay slightly less than
  *    this minimum turn-around time allows the application to make the communication efficient while reducing power consumption by adjusting the time
  *    spent with the receiver activated.
  * 3. This timeout is for complete reception of a frame, i.e. timeout duration must take into account the length of the expected frame. Here the value

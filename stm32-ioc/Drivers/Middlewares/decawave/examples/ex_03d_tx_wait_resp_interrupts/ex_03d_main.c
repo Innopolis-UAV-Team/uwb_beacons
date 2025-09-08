@@ -187,6 +187,7 @@ static void rx_ok_cb(const dwt_cb_data_t *cb_data)
  */
 static void rx_to_cb(const dwt_cb_data_t *cb_data)
 {
+    (void)cb_data;
     /* Set corresponding inter-frame delay. */
     tx_delay_ms = RX_TO_TX_DELAY_MS;
 
@@ -204,6 +205,7 @@ static void rx_to_cb(const dwt_cb_data_t *cb_data)
  */
 static void rx_err_cb(const dwt_cb_data_t *cb_data)
 {
+    (void)cb_data;
     /* Set corresponding inter-frame delay. */
     tx_delay_ms = RX_ERR_TX_DELAY_MS;
 
@@ -221,6 +223,7 @@ static void rx_err_cb(const dwt_cb_data_t *cb_data)
  */
 static void tx_conf_cb(const dwt_cb_data_t *cb_data)
 {
+    (void)cb_data;
     /* This callback has been defined so that a breakpoint can be put here to check it is correctly called but there is actually nothing specific to
      * do on transmission confirmation in this example. Typically, we could activate reception for the response here but this is automatically handled
      * by DW1000 using DWT_RESPONSE_EXPECTED parameter when calling dwt_starttx().
@@ -235,10 +238,10 @@ static void tx_conf_cb(const dwt_cb_data_t *cb_data)
  *
  * 1. The device ID is a hard coded constant in the blink to keep the example simple but for a real product every device should have a unique ID.
  *    For development purposes it is possible to generate a DW1000 unique ID by combining the Lot ID & Part Number values programmed into the
- *    DW1000 during its manufacture. However there is no guarantee this will not conflict with someone else’s implementation. We recommended that
+ *    DW1000 during its manufacture. However there is no guarantee this will not conflict with someone elseï¿½s implementation. We recommended that
  *    customers buy a block of addresses from the IEEE Registration Authority for their production items. See "EUI" in the DW1000 User Manual.
  * 2. TX to RX delay can be set to 0 to activate reception immediately after transmission. But, on the responder side, it takes time to process the
- *    received frame and generate the response (this has been measured experimentally to be around 70 µs). Using an RX to TX delay slightly less than
+ *    received frame and generate the response (this has been measured experimentally to be around 70 ï¿½s). Using an RX to TX delay slightly less than
  *    this minimum turn-around time allows the application to make the communication efficient while reducing power consumption by adjusting the time
  *    spent with the receiver activated.
  * 3. This timeout is for complete reception of a frame, i.e. timeout duration must take into account the length of the expected frame. Here the value

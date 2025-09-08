@@ -22,6 +22,8 @@
 #include "stm32f1xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdio.h>
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -55,6 +57,7 @@
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
+extern SPI_HandleTypeDef hspi1;
 extern UART_HandleTypeDef huart1;
 /* USER CODE BEGIN EV */
 
@@ -84,10 +87,27 @@ void NMI_Handler(void)
 void HardFault_Handler(void)
 {
   /* USER CODE BEGIN HardFault_IRQn 0 */
+  // Add debugging code here
+  volatile uint32_t *hfsr = (volatile uint32_t *)0xE000ED2C;
+  volatile uint32_t *cfsr = (volatile uint32_t *)0xE000ED28;
+  volatile uint32_t *mmfar = (volatile uint32_t *)0xE000ED34;
+  volatile uint32_t *bfar = (volatile uint32_t *)0xE000ED38;
 
+  // Read fault status registers for debugging
+  volatile uint32_t hfsr_val = *hfsr;
+  volatile uint32_t cfsr_val = *cfsr;
+  volatile uint32_t mmfar_val = *mmfar;
+  volatile uint32_t bfar_val = *bfar;
+
+  // Breakpoint here for debugging
+  __asm("BKPT #0");
   /* USER CODE END HardFault_IRQn 0 */
+  char buf[100];
+  snprintf(buf, sizeof(buf), "HardFault! HFSR: 0x%08lX, CFSR: 0x%08lX, MMFAR: 0x%08lX, BFAR: 0x%08lX\n", hfsr_val, cfsr_val, mmfar_val, bfar_val);
   while (1)
   {
+    printf(buf);
+
     /* USER CODE BEGIN W1_HardFault_IRQn 0 */
     /* USER CODE END W1_HardFault_IRQn 0 */
   }
@@ -199,6 +219,34 @@ void SysTick_Handler(void)
 /******************************************************************************/
 
 /**
+  * @brief This function handles EXTI line0 interrupt.
+  */
+void EXTI0_IRQHandler(void)
+{
+  /* USER CODE BEGIN EXTI0_IRQn 0 */
+  HAL_GPIO_TogglePin(GPIOA, LED1_Pin);
+  /* USER CODE END EXTI0_IRQn 0 */
+  HAL_GPIO_EXTI_IRQHandler(DW_IRQn_Pin);
+  /* USER CODE BEGIN EXTI0_IRQn 1 */
+
+  /* USER CODE END EXTI0_IRQn 1 */
+}
+
+/**
+  * @brief This function handles SPI1 global interrupt.
+  */
+void SPI1_IRQHandler(void)
+{
+  /* USER CODE BEGIN SPI1_IRQn 0 */
+
+  /* USER CODE END SPI1_IRQn 0 */
+  HAL_SPI_IRQHandler(&hspi1);
+  /* USER CODE BEGIN SPI1_IRQn 1 */
+
+  /* USER CODE END SPI1_IRQn 1 */
+}
+
+/**
   * @brief This function handles USART1 global interrupt.
   */
 void USART1_IRQHandler(void)
@@ -210,6 +258,21 @@ void USART1_IRQHandler(void)
   /* USER CODE BEGIN USART1_IRQn 1 */
 
   /* USER CODE END USART1_IRQn 1 */
+}
+
+/**
+  * @brief This function handles EXTI line[15:10] interrupts.
+  */
+void EXTI15_10_IRQHandler(void)
+{
+  /* USER CODE BEGIN EXTI15_10_IRQn 0 */
+  HAL_GPIO_TogglePin(GPIOA, LED2_Pin);
+  /* USER CODE END EXTI15_10_IRQn 0 */
+  HAL_GPIO_EXTI_IRQHandler(DW_RESET_Pin);
+  HAL_GPIO_EXTI_IRQHandler(DW_IRQn_old_Pin);
+  /* USER CODE BEGIN EXTI15_10_IRQn 1 */
+
+  /* USER CODE END EXTI15_10_IRQn 1 */
 }
 
 /* USER CODE BEGIN 1 */

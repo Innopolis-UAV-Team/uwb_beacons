@@ -30,7 +30,8 @@
         "multilateration.h": "c",
         "format": "c",
         "streambuf": "c",
-        "rover.c": "cpp"
+        "rover.c": "cpp",
+        "deca_device_api.h": "c"
     },
     "cortex-debug.sourceMap": {
         "/build/arm-none-eabi-newlib/src/build-nano/arm-none-eabi/thumb/v7-m/nofp/newlib": "${workspaceFolder}",

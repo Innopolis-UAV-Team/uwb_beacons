@@ -73,16 +73,21 @@ void Error_Handler(void);
 #define DW_MISO_GPIO_Port GPIOA
 #define DW_MOSI_Pin GPIO_PIN_7
 #define DW_MOSI_GPIO_Port GPIOA
+#define DW_IRQn_Pin GPIO_PIN_0
+#define DW_IRQn_GPIO_Port GPIOB
+#define DW_IRQn_EXTI_IRQn EXTI0_IRQn
 #define DC_Pin GPIO_PIN_1
 #define DC_GPIO_Port GPIOB
 #define RESET_Pin GPIO_PIN_10
 #define RESET_GPIO_Port GPIOB
 #define DW_RESET_Pin GPIO_PIN_12
 #define DW_RESET_GPIO_Port GPIOB
+#define DW_RESET_EXTI_IRQn EXTI15_10_IRQn
 #define DW_WUP_Pin GPIO_PIN_13
 #define DW_WUP_GPIO_Port GPIOB
-#define DW_IRQn_Pin GPIO_PIN_14
-#define DW_IRQn_GPIO_Port GPIOB
+#define DW_IRQn_old_Pin GPIO_PIN_14
+#define DW_IRQn_old_GPIO_Port GPIOB
+#define DW_IRQn_old_EXTI_IRQn EXTI15_10_IRQn
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

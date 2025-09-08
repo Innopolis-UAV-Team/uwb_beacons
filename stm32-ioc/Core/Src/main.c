@@ -27,11 +27,13 @@
 #include <stdio.h>
 #include <string.h>
 #include <stm32f1xx_hal_uart.h>
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 
+extern int dw_main(void);
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -60,6 +62,7 @@ static void MX_GPIO_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_IWDG_Init(void);
+static void MX_NVIC_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -99,6 +102,9 @@ int main(void)
   MX_SPI1_Init();
   MX_USART1_UART_Init();
   MX_IWDG_Init();
+
+  /* Initialize interrupts */
+  MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -106,9 +112,10 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   // target();
-  application_entry_point();
+  // application_entry_point();
   while (1) {
     // target();
+    dw_main();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -153,6 +160,17 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief NVIC Configuration.
+  * @retval None
+  */
+static void MX_NVIC_Init(void)
+{
+  /* EXTI15_10_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 4, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
 
 /**
@@ -237,7 +255,7 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 1 */
   huart1.Instance = USART1;
-  huart1.Init.BaudRate = BAUDRATE;
+  huart1.Init.BaudRate = 115200;
   huart1.Init.WordLength = UART_WORDLENGTH_9B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_EVEN;
@@ -276,7 +294,10 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOA, LED2_Pin|LED1_Pin|CS_Pin|DW_NSS_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, DC_Pin|RESET_Pin|DW_WUP_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, DC_Pin|RESET_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(DW_WUP_GPIO_Port, DW_WUP_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin : LED3_Pin */
   GPIO_InitStruct.Pin = LED3_Pin;
@@ -292,8 +313,14 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : DC_Pin RESET_Pin DW_WUP_Pin */
-  GPIO_InitStruct.Pin = DC_Pin|RESET_Pin|DW_WUP_Pin;
+  /*Configure GPIO pins : DW_IRQn_Pin DW_IRQn_old_Pin */
+  GPIO_InitStruct.Pin = DW_IRQn_Pin|DW_IRQn_old_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : DC_Pin RESET_Pin */
+  GPIO_InitStruct.Pin = DC_Pin|RESET_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -301,15 +328,20 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : DW_RESET_Pin */
   GPIO_InitStruct.Pin = DW_RESET_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(DW_RESET_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : DW_IRQn_Pin */
-  GPIO_InitStruct.Pin = DW_IRQn_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-  HAL_GPIO_Init(DW_IRQn_GPIO_Port, &GPIO_InitStruct);
+  /*Configure GPIO pin : DW_WUP_Pin */
+  GPIO_InitStruct.Pin = DW_WUP_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(DW_WUP_GPIO_Port, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 3, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
 
 }
 
