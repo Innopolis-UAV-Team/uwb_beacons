@@ -107,7 +107,7 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float = None):
                         string += f"res: x={res[0]:.2f}\t y={res[1]:.2f}\t z={res[2]:.2f}\t\t"
                     for i, key in enumerate(keys):
                         string += f"{key}: {row[key]}\t\t"
-                    print(srting)
+                    print(string)
                 except struct.error as e:
                     print(e)
                     print("wrong format: ", response)
