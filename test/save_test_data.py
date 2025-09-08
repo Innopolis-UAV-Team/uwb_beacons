@@ -6,9 +6,13 @@ import serial
 import time
 import argparse
 from common.serial_messages import Message, CircularBuffer, decode
+from common.algoritms import calibrated_qubic
 
 num_entries = 0
-
+a = 3.45936080e-05
+b = -2.47483248e-03
+c = 4.62066120e-02
+d = 1.93440057e-01
 
 def connect_and_save(port: str, baudrate: int = 9600, timeout: float|None = None,
                         file_name: str = "output.txt", num_points: int = 1000):
@@ -48,7 +52,9 @@ def connect_and_save(port: str, baudrate: int = 9600, timeout: float|None = None
                                 msg = buffer.pop()
                                 if msg is None:
                                     continue
-                                f.write(str(Message(msg)) + '\n')
+                                parsed_message = Message(msg)
+                                calibrated_distance = calibrated_qubic(a, b, c, d, parsed_message.data)
+                                f.write(str(Message(msg)) + 'calibrated: ' + str(calibrated_distance) + '\n')
                             f.close()
                 except struct.error as e:
                     print(e)
@@ -75,19 +81,26 @@ if __name__ == "__main__":
     argparser.add_argument('-b', '--baudrate', type=int, default=230400, help='The baud rate for communication. Default is 230400.')
     argparser.add_argument('-n', '--num_points', type=int, default=1000, help='Number of points to collect before stopping. Default is 1000.')
     argparser.add_argument('-d', '--out_dir', type=str, default='data', help='Directory to save the data to. Default is "data".')
+    argparser.add_argument('-r', '--real_distance', type=int, help='Real distance to tag (for error calculation).')
+
+    args = argparser.parse_args()
 
     args = argparser.parse_args()
 
     file_name = f'{args.num_points}_{time.strftime("%Y-%m-%d_%H-%M-%S")}.txt'
     # get the current file directory
 
-    if os.path.exists(os.path.join(os.path.dirname(os.path.realpath(__file__)), args.out_dir)):
-        print(f"Data directory {os.path.join(os.path.dirname(os.path.realpath(__file__)), args.out_dir)} exists.")
+    output_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), args.out_dir)
+    if args.real_distance is not None:
+        real_distance = args.real_distance
+        print(f"Real distance: {real_distance}")
+        output_dir = os.path.join(output_dir, str(real_distance))
+    if os.path.exists(output_dir):
+        print(f"Data directory {output_dir} exists.")
     else:
-        os.mkdir(os.path.join(os.path.dirname(os.path.realpath(__file__)), args.out_dir))
-    file_dir = os.path.dirname(os.path.realpath(__file__))
-
-    full_path = os.path.join(file_dir, args.out_dir, file_name)
+        os.mkdir(output_dir)
+    
+    full_path = os.path.join(output_dir, file_name)
     print(f"The output file will be saved to {full_path}")
     # Replace 'COM3' with the appropriate port for your environment
     connect_and_save(port=args.port, baudrate=args.baudrate,
