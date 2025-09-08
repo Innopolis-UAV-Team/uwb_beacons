@@ -28,3 +28,9 @@ def solve_position(d1: float, d2: float, d3: float, z_sign: int = +1, eps: float
 
     z = math.sqrt(z2) * (1 if z_sign >= 0 else -1)
     return x, y, z
+
+def calibrated_linear(k, b, x):
+    return k * x + b
+
+def calibrated_qubic(a, b, c, d, x):
+    return a * x**3 + b * x**2 + c * x + d
