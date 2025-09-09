@@ -88,6 +88,7 @@ void Error_Handler(void);
 #define DW_IRQn_old_Pin GPIO_PIN_14
 #define DW_IRQn_old_GPIO_Port GPIOB
 #define DW_IRQn_old_EXTI_IRQn EXTI15_10_IRQn
+
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

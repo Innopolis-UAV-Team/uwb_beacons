@@ -101,14 +101,13 @@ void HardFault_Handler(void)
 
   // Breakpoint here for debugging
   __asm("BKPT #0");
-  /* USER CODE END HardFault_IRQn 0 */
   char buf[100];
   snprintf(buf, sizeof(buf), "HardFault! HFSR: 0x%08lX, CFSR: 0x%08lX, MMFAR: 0x%08lX, BFAR: 0x%08lX\n", hfsr_val, cfsr_val, mmfar_val, bfar_val);
+  /* USER CODE END HardFault_IRQn 0 */
   while (1)
   {
-    printf(buf);
-
     /* USER CODE BEGIN W1_HardFault_IRQn 0 */
+    printf(buf);
     /* USER CODE END W1_HardFault_IRQn 0 */
   }
 }
@@ -278,4 +277,3 @@ void EXTI15_10_IRQHandler(void)
 /* USER CODE BEGIN 1 */
 
 /* USER CODE END 1 */
-

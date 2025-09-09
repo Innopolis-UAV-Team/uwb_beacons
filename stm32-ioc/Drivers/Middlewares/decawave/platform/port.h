@@ -108,10 +108,6 @@ typedef enum
 #define DECAIRQ_EXTI_IRQn       (EXTI0_IRQn)
 #endif
 
-#ifndef EXTI15_10_IRQn
-#define EXTI15_10_IRQn      (40)
-#endif
-
 
 #define DW1000_RSTn                 DW_RESET_Pin
 #define DW1000_RSTn_GPIO            DW_RESET_GPIO_Port
