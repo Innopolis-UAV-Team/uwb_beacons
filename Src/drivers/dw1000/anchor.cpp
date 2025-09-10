@@ -1,3 +1,9 @@
+/**
+ * This program is free software under the GNU General Public License v3.
+ * See <https://www.gnu.org/licenses/> for details.
+ * Author: Anastasiia Stepanova <asiiapine@gmail.com>
+*/
+
 #include "dw1000.hpp"
 #include "common.hpp"
 
@@ -56,8 +62,8 @@ int DW1000::init(void) {
     }
 
     port_set_dw1000_fastrate();
-    final_msg[ALL_MSG_SN_IDX] = ANCHOR_ID;
-    poll_msg[ALL_MSG_SN_IDX] = ANCHOR_ID;
+    final_msg[POLL_FIN_ID_IND]  = ANCHOR_ID;
+    poll_msg[POLL_FIN_ID_IND]   = ANCHOR_ID;
 
     /* Configure DW1000. See NOTE 6 below. */
     dwt_configure(&config);
@@ -73,7 +79,8 @@ int DW1000::init(void) {
 
     /* Set response frame timeout. */
     dwt_setrxtimeout(RX_RESP_TO_UUS);
-    ranging_data.insert({ANCHOR_ID, RangingData{0, 0, 0, 0, 0, 0, ANCHOR_ID, IDLE, 0, false}});
+    RangingData data = {0, 0, 0, 0, 0, 0, ANCHOR_ID, IDLE, 0, 0, false};
+    addDataEntry(ANCHOR_ID, data);
     return 0;
 }
 
@@ -82,25 +89,31 @@ void DW1000::spin() {
     if (HAL_GetTick() - last_transmission_ms < (tx_delay_ms)) {
         return;
     }
-    auto it = ranging_data.find(ANCHOR_ID);
-    if (it != ranging_data.end() && it->second.state == RangingState::IDLE) {
+
+    RangingData* data = getValueById(ANCHOR_ID);
+    if (data == nullptr) {
+        return;
+    }
+    if (data->state == RangingState::IDLE) {
         last_transmission_ms = HAL_GetTick();
+        poll_msg[ALL_MSG_SN_IDX] = data->frame_seq_nb;
         /* Write frame data to DW1000 and prepare transmission. See NOTE 7 below. */
         dwt_writetxdata(sizeof(poll_msg), poll_msg, 0); /* Zero offset in TX buffer. */
         dwt_writetxfctrl(sizeof(poll_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
-        /* Start transmission, indicating that a response is expected so that reception is enabled immediately after the frame is sent. */
+        /* Start transmission, indicating that a response is expected so that reception
+        is enabled immediately after the frame is sent. */
+        data->state = SENDING_POLL;
         dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
-        it->second.state = SENDING_POLL;
+        data->start_state_time = HAL_GetTick();
     }
-    if (it != ranging_data.end() && it->second.state == RangingState::PROCESSING_RESPONSE) {
-        RangingData& data = it->second;
+    if (data->state == RangingState::PROCESSING_RESPONSE) {
         /* Write and send final message. See NOTE 8 below. */
-        final_msg[ALL_MSG_SN_IDX] = data.frame_seq_nb;
+        final_msg[ALL_MSG_SN_IDX] = data->frame_seq_nb;
         /* Write all timestamps in the final message. See NOTE 11 below. */
-        final_msg_set_ts(&final_msg[FINAL_MSG_POLL_TX_TS_IDX], data.poll_tx_ts);
-        final_msg_set_ts(&final_msg[FINAL_MSG_RESP_RX_TS_IDX], data.resp_rx_ts);
+        final_msg_set_ts(&final_msg[FINAL_MSG_POLL_TX_TS_IDX], data->poll_tx_ts);
+        final_msg_set_ts(&final_msg[FINAL_MSG_RESP_RX_TS_IDX], data->resp_rx_ts);
         /* Compute final message transmission time. See NOTE 10 below. */
-        uint32_t final_tx_time = (data.resp_rx_ts + (RESP_RX_TO_FINAL_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
+        uint32_t final_tx_time = (data->resp_rx_ts + (RESP_RX_TO_FINAL_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
         dwt_setdelayedtrxtime(final_tx_time);
         /* Final TX timestamp is the transmission time we programmed plus the TX antenna delay. */
         uint64_t final_tx_ts = (((uint64)(final_tx_time & 0xFFFFFFFEUL)) << 8) + TX_ANT_DLY;
@@ -108,10 +121,13 @@ void DW1000::spin() {
         dwt_writetxdata(sizeof(final_msg), final_msg, 0); /* Zero offset in TX buffer. */
         dwt_writetxfctrl(sizeof(final_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
         dwt_starttx(DWT_START_TX_DELAYED);
-        it->second.state = RangingState::SENDING_FINAL;
+        data->state = RangingState::SENDING_FINAL;
+        data->start_state_time = HAL_GetTick();
+    }
+    if (HAL_GetTick() - data->start_state_time > 50) {
+        data->state = RangingState::IDLE;
     }
 }
-
 
 void DW1000::rx_complete_cb(const dwt_cb_data_t *cb_data) {
     int i;
@@ -127,29 +143,37 @@ void DW1000::rx_complete_cb(const dwt_cb_data_t *cb_data) {
         dwt_readrxdata(rx_buffer, cb_data->datalength, 0);
     }
 
-    if (rx_buffer[ALL_MSG_SN_IDX] != ANCHOR_ID) {
-        ranging_data.insert({rx_buffer[ALL_MSG_SN_IDX], RangingData{0, 0, 0, 0, 0, 0,
-                                                    rx_buffer[ALL_MSG_SN_IDX], IDLE, 0, false}});
-        return;
-    }
-
     /* Set corresponding inter-frame delay. */
     tx_delay_ms = DFLT_TX_DELAY_MS;
-    auto it = ranging_data.find(ANCHOR_ID);
-    if (it != ranging_data.end() && it->second.state == RangingState::WAITING_RESPONSE) {
-        frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
-        if (frame_len <= RX_BUF_LEN) {
-            dwt_readrxdata(rx_buffer, frame_len, 0);
+    /* Check message type */
+    RangingData* data = nullptr;
+    switch (rx_buffer[MESSAGE_TYPE_IDX]) {
+    case 0x10:
+        data = getValueById(ANCHOR_ID);
+        if (data->state == RangingState::WAITING_RESPONSE) {
+            frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
+            if (frame_len <= RX_BUF_LEN) {
+                dwt_readrxdata(rx_buffer, frame_len, 0);
+            }
+            uint8_t response_id = rx_buffer[RESPONSE_ID_IND];
+            if (response_id != ANCHOR_ID) {
+                return;
+            }
+            data->resp_rx_ts = get_rx_timestamp_u64();
+            data->state = RangingState::PROCESSING_RESPONSE;
+            data->start_state_time = HAL_GetTick();
         }
-        if (rx_buffer[MESSAGE_TYPE_IDX] != 0x10) {
+        return;
+    default:
+        uint8_t other_id = rx_buffer[POLL_FIN_ID_IND];
+        data = getValueById(other_id);
+        if (data == nullptr) {
+            RangingData ranging_data = RangingData{0, 0, 0, 0, 0, 0,
+                rx_buffer[ALL_MSG_SN_IDX], IDLE, 0, 0, false};
+            addDataEntry(rx_buffer[ALL_MSG_SN_IDX], ranging_data);
             return;
         }
-        if (rx_buffer[ALL_MSG_SN_IDX] != ANCHOR_ID) {
-            return;
-        }
-
-        it->second.resp_rx_ts = get_rx_timestamp_u64();
-        it->second.state = RangingState::PROCESSING_RESPONSE;
+        break;
     }
 }
 
@@ -157,46 +181,42 @@ void DW1000::rx_timeout_cb(const dwt_cb_data_t *cb_data) {
     (void)(cb_data);
     /* Set corresponding inter-frame delay. */
     tx_delay_ms = RX_TO_TX_DELAY_MS;
-    auto it = ranging_data.find(ANCHOR_ID);
-    if (it != ranging_data.end()) {
-        it->second.state = RangingState::IDLE;
+    RangingData* data = getValueById(rx_buffer[ALL_MSG_SN_IDX]);
+    if (data == nullptr) {
+        return;
     }
-    /* TESTING BREAKPOINT LOCATION #2 */
+    data->state = RangingState::IDLE;
 }
 
 void DW1000::rx_error_cb(const dwt_cb_data_t *cb_data) {
     (void)(cb_data);
     /* Set corresponding inter-frame delay. */
     tx_delay_ms = RX_ERR_TX_DELAY_MS;
-    auto it = ranging_data.find(ANCHOR_ID);
-    if (it != ranging_data.end()) {
-        it->second.state = RangingState::IDLE;
-    }    /* TESTING BREAKPOINT LOCATION #3 */
+    RangingData* data = getValueById(rx_buffer[ALL_MSG_SN_IDX]);
+    if (data == nullptr) {
+        return;
+    }
+    data->state = RangingState::IDLE;
 }
 
 void DW1000::tx_complete_cb(const dwt_cb_data_t *cb_data) {
     (void)(cb_data);
     tx_msg[BLINK_FRAME_SN_IDX]++;
-    auto it = ranging_data.find(ANCHOR_ID);
-    if (it != ranging_data.end()) {
-        if (it->second.state == SENDING_POLL) {
-            it->second.state = WAITING_RESPONSE;
-        }
-        RangingData& data = it->second;
-        switch (data.state) {
-            case RangingState::SENDING_POLL:
-                data.poll_tx_ts = get_tx_timestamp_u64();
-                data.state = RangingState::WAITING_RESPONSE;
-                break;
-            case RangingState::SENDING_FINAL:
-                data.state = RangingState::IDLE;
-                break;
-            default:
-                data.state = RangingState::IDLE;
-                break;
-        }
-        data.frame_seq_nb++;
+    RangingData* data = getValueById(ANCHOR_ID);
+    switch (data->state) {
+        case RangingState::SENDING_POLL:
+            data->poll_tx_ts = get_tx_timestamp_u64();
+            data->state = RangingState::WAITING_RESPONSE;
+            data->start_state_time = HAL_GetTick();
+            break;
+        case RangingState::SENDING_FINAL:
+            data->state = RangingState::IDLE;
+            break;
+        default:
+            data->state = RangingState::IDLE;
+            break;
     }
+    data->frame_seq_nb++;
     state_start_time = HAL_GetTick();
     /* Reset the TX delay and event signalling mechanism ready to await the next event. */
     tx_delay_ms =  0;

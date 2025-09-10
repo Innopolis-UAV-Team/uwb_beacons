@@ -15,6 +15,8 @@
 
 /* Default communication configuration. We use here EVK1000's default mode (mode 3). */
 extern dwt_config_t config;
+const uint8_t POLL_FIN_ID_IND = 8;
+const uint8_t RESPONSE_ID_IND = 6;
 
 class DW1000 {
  public:
@@ -22,8 +24,9 @@ class DW1000 {
     void spin();
 
  private:
+    static const uint8_t MAX_ENTRIES = 20;
     enum RangingState {
-        IDLE,
+        IDLE = 0,
         SENDING_POLL,
         WAITING_RESPONSE,
         SENDING_RESPONSE,
@@ -42,16 +45,44 @@ class DW1000 {
         uint8_t anchor_id;
         RangingState state;
         uint8 frame_seq_nb;
+        uint32_t start_state_time;
         bool data_valid;
     };
+    typedef struct {
+        int id;
+        RangingData value;
+    } DataEntry;
 
-    static std::map<uint8_t, RangingData> ranging_data;
+    static DataEntry data_array[MAX_ENTRIES];
+    static uint8_t data_array_entry_count;
+    /*
+    * @fn getValueById()
+    * @brief Get the value of the entry with the given ID
+    * @param id ID of the entry
+    * @return Pointer to the value of the entry with the given ID, or nullptr if not found
+    */
+    static inline RangingData* getValueById(uint8_t id) {
+        for (int i = 0; i < data_array_entry_count; i++) {
+            if (data_array[i].id == id) {
+                return &data_array[i].value;  // Return the value if ID matches
+            }
+        }
+        return nullptr;
+    }
+    static void addDataEntry(uint8_t id, RangingData data) {
+        if (data_array_entry_count < MAX_ENTRIES) {
+            data_array[data_array_entry_count].id = id;
+            data_array[data_array_entry_count].value = data;
+            data_array_entry_count++;
+        }
+    }
+
     // static RangingState current_state;
     static uint32_t state_start_time;
     static uint8_t poll_msg[12];
     static uint8_t resp_msg[15];
     static uint8_t final_msg[24];
-    // static bool message_sent;
+
     /*
     * @fn rx_ok_cb()
     *
@@ -64,31 +95,22 @@ class DW1000 {
     static void rx_complete_cb(const dwt_cb_data_t *cb_data);
     /*
     * @fn rx_timeout_cb()
-    *
     * @brief Callback to process RX timeout events
-    *
     * @param  cb_data  callback data
-    *
     * @return  none
     */
     static void rx_timeout_cb(const dwt_cb_data_t *cb_data);
     /*
     * @fn rx_error_cb()
-    *
     * @brief Callback to process RX error events
-    *
     * @param  cb_data  callback data
-    *
     * @return  none
     */
     static void rx_error_cb(const dwt_cb_data_t *cb_data);
     /*
     * @fn tx_complete_cb()
-    *
     * @brief Callback to process TX confirmation events
-    *
     * @param  cb_data  callback data
-    *
     * @return  none
     */
     static void tx_complete_cb(const dwt_cb_data_t *cb_data);

@@ -24,11 +24,10 @@ dwt_config_t config = {
 DW1000 dw1000;
 
 uint32_t DW1000::state_start_time = 0;
+DW1000::DataEntry DW1000::data_array[MAX_ENTRIES] = {};
 
+uint8_t DW1000::data_array_entry_count = 0;
 uint8_t DW1000::poll_msg[12] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 0x00, 0x21, 0, 0};
 uint8_t DW1000::resp_msg[15] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 0x00, 'W', 'A', 0x10, 0x02, 0, 0, 0, 0};
 uint8_t DW1000::final_msg[24] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 0x00, 0x23, 0, 0,
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-
-// bool DW1000::message_sent = false;
-std::map<uint8_t, DW1000::RangingData> DW1000::ranging_data = {};
