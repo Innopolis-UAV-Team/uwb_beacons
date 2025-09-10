@@ -1,4 +1,7 @@
 #include "dw1000.hpp"
+#include <vector>
+#include <unordered_map>
+#include <map>
 
 /* The frame sent in this example is a blink encoded as per the ISO/IEC 24730-62:2013 standard. It is a 14-byte frame composed of the following fields:
  *     - byte 0: frame control (0xC5 to indicate a multipurpose frame using 64-bit addressing).
@@ -34,6 +37,7 @@ static uint16 frame_len = 0;
  * Application entry point.
  */
 int DW1000::init() {
+    ranging_data[0] = RangingData{0, 0, 0, 0, 0, 0, 0, false};
     /* Reset and initialise DW1000. See NOTE 5 below.
     * For initialisation, DW1000 clocks must be temporarily set to crystal speed. After initialisation SPI rate can be increased for optimum
     * performance. */

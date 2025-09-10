@@ -1,5 +1,5 @@
 #include "dw1000.hpp"
-
+#include "common.hpp"
 
 /* The frame sent in this example is a blink encoded as per the ISO/IEC 24730-62:2013 standard. It is a 14-byte frame composed of the following fields:
  *     - byte 0: frame control (0xC5 to indicate a multipurpose frame using 64-bit addressing).
@@ -11,6 +11,10 @@
 static uint8 tx_msg[] = {0xC5, 0, 'D', 'E', 'C', 'A', 'W', 'A', 'V', 'E', 0x43, 0x02, 0, 0};
 /* Index to access the sequence number of the blink frame in the tx_msg array. */
 #define BLINK_FRAME_SN_IDX 1
+
+#ifndef ANCHOR_ID
+#define ANCHOR_ID 0x1
+#endif
 
 /* Delay from end of transmission to activation of reception, expressed in UWB microseconds (1 uus is 512/499.2 microseconds). See NOTE 2 below. */
 #define TX_TO_RX_DELAY_UUS 60
@@ -35,17 +39,10 @@ static uint32 tx_delay_ms = 0;
 #define FRAME_LEN_MAX 127
 static uint8 rx_buffer[FRAME_LEN_MAX];
 
-/* Declaration of static functions. */
-static void rx_ok_cb(const dwt_cb_data_t *cb_data);
-static void rx_to_cb(const dwt_cb_data_t *cb_data);
-static void rx_err_cb(const dwt_cb_data_t *cb_data);
-static void tx_conf_cb(const dwt_cb_data_t *cb_data);
-
 /**
  * Application entry point.
  */
-int DW1000::init(void)
-{
+int DW1000::init(void) {
     /* Install DW1000 IRQ handler. */
     port_set_deca_isr(dwt_isr);
 
@@ -57,13 +54,16 @@ int DW1000::init(void)
     if (dwt_initialise(DWT_LOADNONE) == DWT_ERROR) {
         return -1;
     }
+
     port_set_dw1000_fastrate();
+    final_msg[ALL_MSG_SN_IDX] = ANCHOR_ID;
+    poll_msg[ALL_MSG_SN_IDX] = ANCHOR_ID;
 
     /* Configure DW1000. See NOTE 6 below. */
     dwt_configure(&config);
 
     /* Register RX call-back. */
-    dwt_setcallbacks(&tx_conf_cb, &rx_ok_cb, &rx_to_cb, &rx_err_cb);
+    dwt_setcallbacks(&tx_complete_cb, &rx_complete_cb, &rx_timeout_cb, &rx_error_cb);
 
     /* Enable wanted interrupts (TX confirmation, RX good frames, RX timeouts and RX errors). */
     dwt_setinterrupt(DWT_INT_TFRS | DWT_INT_RFCG | DWT_INT_RFTO | DWT_INT_RXPTO | DWT_INT_RPHE | DWT_INT_RFCE | DWT_INT_RFSL | DWT_INT_SFDT, 1);
@@ -73,38 +73,49 @@ int DW1000::init(void)
 
     /* Set response frame timeout. */
     dwt_setrxtimeout(RX_RESP_TO_UUS);
+    ranging_data.insert({ANCHOR_ID, RangingData{0, 0, 0, 0, 0, 0, ANCHOR_ID, IDLE, 0, false}});
     return 0;
 }
 
 void DW1000::spin() {
     static uint32_t last_transmission_ms = HAL_GetTick();
-
     if (HAL_GetTick() - last_transmission_ms < (tx_delay_ms)) {
         return;
     }
-
-    last_transmission_ms = HAL_GetTick();
-    /* Write frame data to DW1000 and prepare transmission. See NOTE 7 below. */
-    dwt_writetxdata(sizeof(tx_msg), tx_msg, 0); /* Zero offset in TX buffer. */
-    dwt_writetxfctrl(sizeof(tx_msg), 0, 0); /* Zero offset in TX buffer, no ranging. */
-
-    /* Start transmission, indicating that a response is expected so that reception is enabled immediately after the frame is sent. */
-    dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
+    auto it = ranging_data.find(ANCHOR_ID);
+    if (it != ranging_data.end() && it->second.state == RangingState::IDLE) {
+        last_transmission_ms = HAL_GetTick();
+        /* Write frame data to DW1000 and prepare transmission. See NOTE 7 below. */
+        dwt_writetxdata(sizeof(poll_msg), poll_msg, 0); /* Zero offset in TX buffer. */
+        dwt_writetxfctrl(sizeof(poll_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
+        /* Start transmission, indicating that a response is expected so that reception is enabled immediately after the frame is sent. */
+        dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
+        it->second.state = SENDING_POLL;
+    }
+    if (it != ranging_data.end() && it->second.state == RangingState::PROCESSING_RESPONSE) {
+        RangingData& data = it->second;
+        /* Write and send final message. See NOTE 8 below. */
+        final_msg[ALL_MSG_SN_IDX] = data.frame_seq_nb;
+        /* Write all timestamps in the final message. See NOTE 11 below. */
+        final_msg_set_ts(&final_msg[FINAL_MSG_POLL_TX_TS_IDX], data.poll_tx_ts);
+        final_msg_set_ts(&final_msg[FINAL_MSG_RESP_RX_TS_IDX], data.resp_rx_ts);
+        /* Compute final message transmission time. See NOTE 10 below. */
+        uint32_t final_tx_time = (data.resp_rx_ts + (RESP_RX_TO_FINAL_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
+        dwt_setdelayedtrxtime(final_tx_time);
+        /* Final TX timestamp is the transmission time we programmed plus the TX antenna delay. */
+        uint64_t final_tx_ts = (((uint64)(final_tx_time & 0xFFFFFFFEUL)) << 8) + TX_ANT_DLY;
+        final_msg_set_ts(&final_msg[FINAL_MSG_FINAL_TX_TS_IDX], final_tx_ts);
+        dwt_writetxdata(sizeof(final_msg), final_msg, 0); /* Zero offset in TX buffer. */
+        dwt_writetxfctrl(sizeof(final_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
+        dwt_starttx(DWT_START_TX_DELAYED);
+        it->second.state = RangingState::SENDING_FINAL;
+    }
 }
 
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn rx_ok_cb()
- *
- * @brief Callback to process RX good frame events
- *
- * @param  cb_data  callback data
- *
- * @return  none
- */
-static void rx_ok_cb(const dwt_cb_data_t *cb_data)
-{
-    int i;
 
+void DW1000::rx_complete_cb(const dwt_cb_data_t *cb_data) {
+    int i;
+    uint32_t frame_len = 0;
     /* Clear local RX buffer to avoid having leftovers from previous receptions. This is not necessary but is included here to aid reading the RX
      * buffer. */
     for (i = 0; i < FRAME_LEN_MAX; i++) {
@@ -116,62 +127,77 @@ static void rx_ok_cb(const dwt_cb_data_t *cb_data)
         dwt_readrxdata(rx_buffer, cb_data->datalength, 0);
     }
 
+    if (rx_buffer[ALL_MSG_SN_IDX] != ANCHOR_ID) {
+        ranging_data.insert({rx_buffer[ALL_MSG_SN_IDX], RangingData{0, 0, 0, 0, 0, 0,
+                                                    rx_buffer[ALL_MSG_SN_IDX], IDLE, 0, false}});
+        return;
+    }
+
     /* Set corresponding inter-frame delay. */
     tx_delay_ms = DFLT_TX_DELAY_MS;
+    auto it = ranging_data.find(ANCHOR_ID);
+    if (it != ranging_data.end() && it->second.state == RangingState::WAITING_RESPONSE) {
+        frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
+        if (frame_len <= RX_BUF_LEN) {
+            dwt_readrxdata(rx_buffer, frame_len, 0);
+        }
+        if (rx_buffer[MESSAGE_TYPE_IDX] != 0x10) {
+            return;
+        }
+        if (rx_buffer[ALL_MSG_SN_IDX] != ANCHOR_ID) {
+            return;
+        }
 
-    /* TESTING BREAKPOINT LOCATION #1 */
+        it->second.resp_rx_ts = get_rx_timestamp_u64();
+        it->second.state = RangingState::PROCESSING_RESPONSE;
+    }
 }
 
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn rx_to_cb()
- *
- * @brief Callback to process RX timeout events
- *
- * @param  cb_data  callback data
- *
- * @return  none
- */
-static void rx_to_cb(const dwt_cb_data_t *cb_data)
-{
+void DW1000::rx_timeout_cb(const dwt_cb_data_t *cb_data) {
     (void)(cb_data);
     /* Set corresponding inter-frame delay. */
     tx_delay_ms = RX_TO_TX_DELAY_MS;
-
+    auto it = ranging_data.find(ANCHOR_ID);
+    if (it != ranging_data.end()) {
+        it->second.state = RangingState::IDLE;
+    }
     /* TESTING BREAKPOINT LOCATION #2 */
 }
 
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn rx_err_cb()
- *
- * @brief Callback to process RX error events
- *
- * @param  cb_data  callback data
- *
- * @return  none
- */
-static void rx_err_cb(const dwt_cb_data_t *cb_data)
-{
+void DW1000::rx_error_cb(const dwt_cb_data_t *cb_data) {
     (void)(cb_data);
     /* Set corresponding inter-frame delay. */
     tx_delay_ms = RX_ERR_TX_DELAY_MS;
-
-    /* TESTING BREAKPOINT LOCATION #3 */
+    auto it = ranging_data.find(ANCHOR_ID);
+    if (it != ranging_data.end()) {
+        it->second.state = RangingState::IDLE;
+    }    /* TESTING BREAKPOINT LOCATION #3 */
 }
 
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn tx_conf_cb()
- *
- * @brief Callback to process TX confirmation events
- *
- * @param  cb_data  callback data
- *
- * @return  none
- */
-static void tx_conf_cb(const dwt_cb_data_t *cb_data)
-{
+void DW1000::tx_complete_cb(const dwt_cb_data_t *cb_data) {
     (void)(cb_data);
     tx_msg[BLINK_FRAME_SN_IDX]++;
-
+    auto it = ranging_data.find(ANCHOR_ID);
+    if (it != ranging_data.end()) {
+        if (it->second.state == SENDING_POLL) {
+            it->second.state = WAITING_RESPONSE;
+        }
+        RangingData& data = it->second;
+        switch (data.state) {
+            case RangingState::SENDING_POLL:
+                data.poll_tx_ts = get_tx_timestamp_u64();
+                data.state = RangingState::WAITING_RESPONSE;
+                break;
+            case RangingState::SENDING_FINAL:
+                data.state = RangingState::IDLE;
+                break;
+            default:
+                data.state = RangingState::IDLE;
+                break;
+        }
+        data.frame_seq_nb++;
+    }
+    state_start_time = HAL_GetTick();
     /* Reset the TX delay and event signalling mechanism ready to await the next event. */
     tx_delay_ms =  0;
     /* This callback has been defined so that a breakpoint can be put here to check it is correctly called but there is actually nothing specific to

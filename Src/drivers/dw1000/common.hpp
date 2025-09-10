@@ -4,6 +4,11 @@
 /* Length of the common part of the message
 (up to and including the function code,see NOTE 1 below). */
 #define ALL_MSG_COMMON_LEN 10
+#define MESSAGE_TYPE_IDX   10
+/* Speed of light in air, in metres per second. */
+#define SPEED_OF_LIGHT 299702547
+
+#define UUS_TO_DWT_TIME 65536
 /* Buffer to store received response message.
  * Its size is adjusted to longest frame that this code is supposed to handle. */
 #define RX_BUF_LEN 20
@@ -18,6 +23,10 @@
 #define PRE_TIMEOUT 8
 /* Delay between frames, in UWB microseconds. See NOTE 3 below. */
 
+/* Default antenna delay values for 64 MHz PRF. See NOTE 1 below. */
+#define TX_ANT_DLY 16436
+#define RX_ANT_DLY 16436
+
 /* This is the delay from the end of the frame transmission to
 the enable of the receiver, as programmed for the DW1000's wait for response feature. */
 #define POLL_TX_TO_RESP_RX_DLY_UUS 300
@@ -26,6 +35,68 @@ the enable of the receiver, as programmed for the DW1000's wait for response fea
 #define RESP_RX_TO_FINAL_TX_DLY_UUS 3100
 /* Receive response timeout. See NOTE 5 below. */
 #define RESP_RX_TIMEOUT_UUS 2700
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn get_tx_timestamp_u64()
+ *
+ * @brief Get the TX time-stamp in a 64-bit variable.
+ *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
+ *
+ * @param  none
+ *
+ * @return  64-bit value of the read time-stamp.
+ */
+uint64_t get_tx_timestamp_u64(void) {
+    uint8_t ts_tab[5];
+    uint64_t ts = 0;
+    int i;
+    dwt_readtxtimestamp(ts_tab);
+    for (i = 4; i >= 0; i--) {
+        ts <<= 8;
+        ts |= ts_tab[i];
+    }
+    return ts;
+}
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn get_rx_timestamp_u64()
+ *
+ * @brief Get the RX time-stamp in a 64-bit variable.
+ *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
+ *
+ * @param  none
+ *
+ * @return  64-bit value of the read time-stamp.
+ */
+static uint64_t get_rx_timestamp_u64(void) {
+    uint8_t ts_tab[5];
+    uint64_t ts = 0;
+    int i;
+    dwt_readrxtimestamp(ts_tab);
+    for (i = 4; i >= 0; i--) {
+        ts <<= 8;
+        ts |= ts_tab[i];
+    }
+    return ts;
+}
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn final_msg_set_ts()
+ *
+ * @brief Fill a given timestamp field in the final message with the given value. In the timestamp fields of the final
+ *        message, the least significant byte is at the lower address.
+ *
+ * @param  ts_field  pointer on the first byte of the timestamp field to fill
+ *         ts  timestamp value
+ *
+ * @return none
+ */
+static void final_msg_set_ts(uint8_t *ts_field, uint64_t ts) {
+    int i;
+    for (i = 0; i < FINAL_MSG_TS_LEN; i++) {
+        ts_field[i] = (uint8_t) ts;
+        ts >>= 8;
+    }
+}
+
+
 #endif  // SRC_DRIVERS_DW1000_COMMON_HPP_
 
 /*
