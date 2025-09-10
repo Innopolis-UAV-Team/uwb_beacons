@@ -17,6 +17,16 @@
                 "interface/stlink.cfg", // Or your interface config
                 "target/stm32f1x.cfg"    // Or your target config
             ],
+        "connectUnderReset": true,
+        "serverArgs": ["-c", "adapter speed 1000"],
+        "preLaunchCommands": [
+            "monitor reset halt"
+        ],
+        "overrideLaunchCommands": [
+            "monitor reset",
+            "-target-download",
+            "monitor reset"
+        ],
     },
     {
         "name": "anchor Simple Cortex Debug",
@@ -31,6 +41,19 @@
                 "interface/stlink.cfg", // Or your interface config
                 "target/stm32f1x.cfg"    // Or your target config
             ],
+        "connectUnderReset": true,
+        "serverArgs": ["-c", "adapter speed 1000"],
+        "preLaunchCommands": [
+            "monitor reset halt"
+        ],
+        "overrideLaunchCommands": [
+            "monitor reset",
+            "-target-download",
+            "monitor reset"
+        ],
+        // "overrideRestartCommands": [
+        //     "monitor reset"
+        // ],
     },
     ]
 }

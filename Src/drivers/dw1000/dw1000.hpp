@@ -11,7 +11,6 @@
 #include "deca_regs.h"
 #include "deca_spi.h"
 #include "port.h"
-#include <map>
 
 /* Default communication configuration. We use here EVK1000's default mode (mode 3). */
 extern dwt_config_t config;
@@ -22,18 +21,20 @@ class DW1000 {
  public:
     int init();
     void spin();
+    static const uint8_t MAX_ENTRIES = 20;
 
  private:
-    static const uint8_t MAX_ENTRIES = 20;
     enum RangingState {
         IDLE = 0,
         SENDING_POLL,
+        PROCESSING_POLL,
         WAITING_RESPONSE,
         SENDING_RESPONSE,
         PROCESSING_RESPONSE,
         WAITING_FINAL,
         SENDING_FINAL,
         PROCESSING_RESULT,
+        SENDING_ACK,
     };
     struct RangingData {
         uint64_t poll_tx_ts;
@@ -44,7 +45,6 @@ class DW1000 {
         uint64_t final_tx_ts;
         uint8_t anchor_id;
         RangingState state;
-        uint8 frame_seq_nb;
         uint32_t start_state_time;
         bool data_valid;
     };
@@ -53,6 +53,7 @@ class DW1000 {
         RangingData value;
     } DataEntry;
 
+    static uint8_t frame_seq_nb;
     static DataEntry data_array[MAX_ENTRIES];
     static uint8_t data_array_entry_count;
     /*
@@ -79,10 +80,13 @@ class DW1000 {
 
     // static RangingState current_state;
     static uint32_t state_start_time;
-    static uint8_t poll_msg[12];
-    static uint8_t resp_msg[15];
-    static uint8_t final_msg[24];
 
+    static uint8_t ack_msg[12];     // used by router to acknowledge it's presence
+    static uint8_t poll_msg[12];    // used by anchor to poll for a response
+    static uint8_t resp_msg[15];    // used by router to respond to an anchor
+    static uint8_t final_msg[24];   // used by anchor to send the final message
+
+    void spin_router_for_one_anchor(uint8_t anchor_id);
     /*
     * @fn rx_ok_cb()
     *

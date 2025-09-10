@@ -7,14 +7,6 @@
 #include "dw1000.hpp"
 #include "common.hpp"
 
-/* The frame sent in this example is a blink encoded as per the ISO/IEC 24730-62:2013 standard. It is a 14-byte frame composed of the following fields:
- *     - byte 0: frame control (0xC5 to indicate a multipurpose frame using 64-bit addressing).
- *     - byte 1: sequence number, incremented for each new frame.
- *     - byte 2 -> 9: device ID, see NOTE 1 below.
- *     - byte 10: encoding header (0x43 to indicate no extended ID, temperature, or battery status is carried in the message).
- *     - byte 11: EXT header (0x02 to indicate tag is listening for a response immediately after this message).
- *     - byte 12/13: frame check-sum, automatically set by DW1000. */
-static uint8 tx_msg[] = {0xC5, 0, 'D', 'E', 'C', 'A', 'W', 'A', 'V', 'E', 0x43, 0x02, 0, 0};
 /* Index to access the sequence number of the blink frame in the tx_msg array. */
 #define BLINK_FRAME_SN_IDX 1
 
@@ -44,7 +36,7 @@ static uint32 tx_delay_ms = 0;
 /* Buffer to store received frame. See NOTE 4 below. */
 #define FRAME_LEN_MAX 127
 static uint8 rx_buffer[FRAME_LEN_MAX];
-
+static uint32_t last_transmission_ms = 0;
 /**
  * Application entry point.
  */
@@ -85,7 +77,6 @@ int DW1000::init(void) {
 }
 
 void DW1000::spin() {
-    static uint32_t last_transmission_ms = HAL_GetTick();
     if (HAL_GetTick() - last_transmission_ms < (tx_delay_ms)) {
         return;
     }
@@ -96,7 +87,7 @@ void DW1000::spin() {
     }
     if (data->state == RangingState::IDLE) {
         last_transmission_ms = HAL_GetTick();
-        poll_msg[ALL_MSG_SN_IDX] = data->frame_seq_nb;
+        poll_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
         /* Write frame data to DW1000 and prepare transmission. See NOTE 7 below. */
         dwt_writetxdata(sizeof(poll_msg), poll_msg, 0); /* Zero offset in TX buffer. */
         dwt_writetxfctrl(sizeof(poll_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
@@ -108,7 +99,7 @@ void DW1000::spin() {
     }
     if (data->state == RangingState::PROCESSING_RESPONSE) {
         /* Write and send final message. See NOTE 8 below. */
-        final_msg[ALL_MSG_SN_IDX] = data->frame_seq_nb;
+        final_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
         /* Write all timestamps in the final message. See NOTE 11 below. */
         final_msg_set_ts(&final_msg[FINAL_MSG_POLL_TX_TS_IDX], data->poll_tx_ts);
         final_msg_set_ts(&final_msg[FINAL_MSG_RESP_RX_TS_IDX], data->resp_rx_ts);
@@ -148,7 +139,7 @@ void DW1000::rx_complete_cb(const dwt_cb_data_t *cb_data) {
     /* Check message type */
     RangingData* data = nullptr;
     switch (rx_buffer[MESSAGE_TYPE_IDX]) {
-    case 0x10:
+    case RESP_MSG_SPECIAL_ID:
         data = getValueById(ANCHOR_ID);
         if (data->state == RangingState::WAITING_RESPONSE) {
             frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
@@ -164,6 +155,16 @@ void DW1000::rx_complete_cb(const dwt_cb_data_t *cb_data) {
             data->start_state_time = HAL_GetTick();
         }
         return;
+    case ACKN_MSG_SPECIAL_ID:
+        data = getValueById(ANCHOR_ID);
+        if (data == nullptr) {
+            RangingData ranging_data = RangingData{0, 0, 0, 0, 0, 0,
+                ANCHOR_ID, IDLE, 0, 0, false};
+            addDataEntry(ANCHOR_ID, ranging_data);
+            return;
+        }
+        data->state = RangingState::IDLE;
+        break;
     default:
         uint8_t other_id = rx_buffer[POLL_FIN_ID_IND];
         data = getValueById(other_id);
@@ -181,7 +182,7 @@ void DW1000::rx_timeout_cb(const dwt_cb_data_t *cb_data) {
     (void)(cb_data);
     /* Set corresponding inter-frame delay. */
     tx_delay_ms = RX_TO_TX_DELAY_MS;
-    RangingData* data = getValueById(rx_buffer[ALL_MSG_SN_IDX]);
+    RangingData* data = getValueById(ANCHOR_ID);
     if (data == nullptr) {
         return;
     }
@@ -192,7 +193,7 @@ void DW1000::rx_error_cb(const dwt_cb_data_t *cb_data) {
     (void)(cb_data);
     /* Set corresponding inter-frame delay. */
     tx_delay_ms = RX_ERR_TX_DELAY_MS;
-    RangingData* data = getValueById(rx_buffer[ALL_MSG_SN_IDX]);
+    RangingData* data = getValueById(ANCHOR_ID);
     if (data == nullptr) {
         return;
     }
@@ -201,7 +202,6 @@ void DW1000::rx_error_cb(const dwt_cb_data_t *cb_data) {
 
 void DW1000::tx_complete_cb(const dwt_cb_data_t *cb_data) {
     (void)(cb_data);
-    tx_msg[BLINK_FRAME_SN_IDX]++;
     RangingData* data = getValueById(ANCHOR_ID);
     switch (data->state) {
         case RangingState::SENDING_POLL:
@@ -216,17 +216,11 @@ void DW1000::tx_complete_cb(const dwt_cb_data_t *cb_data) {
             data->state = RangingState::IDLE;
             break;
     }
-    data->frame_seq_nb++;
+    frame_seq_nb++;
     state_start_time = HAL_GetTick();
+    last_transmission_ms = HAL_GetTick();
     /* Reset the TX delay and event signalling mechanism ready to await the next event. */
     tx_delay_ms =  0;
-    /* This callback has been defined so that a breakpoint can be put here to check it is correctly called but there is actually nothing specific to
-     * do on transmission confirmation in this example. Typically, we could activate reception for the response here but this is automatically handled
-     * by DW1000 using DWT_RESPONSE_EXPECTED parameter when calling dwt_starttx().
-     * An actual application that would not need this callback could simply not define it and set the corresponding field to NULL when calling
-     * dwt_setcallbacks(). The ISR will not call it which will allow to save some interrupt processing time. */
-
-    /* TESTING BREAKPOINT LOCATION #4 */
 }
 
 /*****************************************************************************************************************************************************

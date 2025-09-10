@@ -99,13 +99,4 @@
         "valarray": "cpp",
         "variant": "cpp"
     },
-    "cortex-debug.sourceMap": {
-        "/build/arm-none-eabi-newlib/src/build-nano/arm-none-eabi/thumb/v7-m/nofp/newlib": "${workspaceFolder}",
-        "/build": "${workspaceFolder}"
-    },
-    "cortex-debug.searchDir": [
-        "${workspaceFolder}/Src",
-        "${workspaceFolder}/stm32-ioc/Core/Src",
-        "${workspaceFolder}/stm32-ioc/Drivers"
-    ]
 }

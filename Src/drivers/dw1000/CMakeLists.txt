@@ -23,5 +23,6 @@ endif()
 
 list(APPEND APPLICATION_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/dw1000.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/common.cpp
     ${DW1000_SRCS}
 )
