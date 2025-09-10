@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15.3)
 
-# Pathes
+# Paths
 set(ROOT_DIR ${CMAKE_CURRENT_LIST_DIR})
 set(SRC_DIR ${ROOT_DIR}/Src)
 set(CMAKE_DIR ${ROOT_DIR})
