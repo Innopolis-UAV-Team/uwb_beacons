@@ -142,6 +142,7 @@ void DW1000::rx_complete_cb(const dwt_cb_data_t *cb_data) {
             }
             data->resp_rx_ts = dwt_readrxtimestamplo32();
             data->state = RangingState::PROCESSING_RESPONSE;
+            process_msg(data);
             data->start_state_time = HAL_GetTick();
         }
         return;
