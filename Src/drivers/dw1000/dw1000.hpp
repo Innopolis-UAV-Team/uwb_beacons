@@ -38,11 +38,11 @@ class DW1000 {
     };
     struct RangingData {
         uint32_t poll_tx_ts;
-        uint64_t poll_rx_ts;
-        uint64_t resp_tx_ts;
+        uint32_t poll_rx_ts;
+        uint32_t resp_tx_ts;
         uint32_t resp_rx_ts;
-        uint64_t final_rx_ts;
-        uint64_t final_tx_ts;
+        uint32_t final_rx_ts;
+        uint32_t final_tx_ts;
         uint8_t anchor_id;
         RangingState state;
         uint32_t start_state_time;
@@ -61,6 +61,8 @@ class DW1000 {
     static uint8_t frame_seq_nb;
     static DataEntry data_array[MAX_ENTRIES];
     static uint8_t data_array_entry_count;
+
+    static void process_msg(RangingData* data);
     /*
     * @fn getValueById()
     * @brief Get the value of the entry with the given ID

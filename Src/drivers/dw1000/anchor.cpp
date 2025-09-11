@@ -96,6 +96,13 @@ void DW1000::spin() {
         dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
         data->start_state_time = HAL_GetTick();
     }
+
+    if (HAL_GetTick() - data->start_state_time > 500) {
+        data->state = RangingState::IDLE;
+    }
+}
+
+void DW1000::process_msg(RangingData* data) {
     if (data->state == RangingState::PROCESSING_RESPONSE) {
         /* Write and send final message. See NOTE 8 below. */
         final_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
@@ -121,9 +128,6 @@ void DW1000::spin() {
         data->state = RangingState::SENDING_FINAL;
         data->start_state_time = HAL_GetTick();
         data->resp_rx_ts = 0;
-    }
-    if (HAL_GetTick() - data->start_state_time > 500) {
-        data->state = RangingState::IDLE;
     }
 }
 

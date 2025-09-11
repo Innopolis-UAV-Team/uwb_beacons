@@ -91,7 +91,7 @@ void get_rx_timestamp_u64(uint64_t ts);
  *
  * @return none
  */
-void final_msg_get_ts(const uint8_t *ts_field, uint32_t *ts);
+void final_msg_set_ts(uint8_t *ts_field, uint64_t ts);
 
 /*!
  * @fn final_msg_get_ts()

@@ -93,56 +93,28 @@ void DW1000::spin_router_for_one_anchor(uint8_t anchor_id) {
         data->state = RangingState::IDLE;
     }
 
-    if (data->state == RangingState::PROCESSING_POLL) {
-        if (data->poll_rx_ts == 0) {
-            data->poll_rx_ts = dwt_readrxtimestamplo32();
-        }
-        if (HAL_GetTick() - last_transmission_ms < (tx_delay_ms)) {
-            return;
-        }
-        // uint32_t resp_tx_time;
-        // uint32_t resp_tx_time = (dwt_readtxtimestamplo32() + (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
-        // dwt_setdelayedtrxtime(resp_tx_time);
-        /* Set expected delay and timeout for final message reception. */
-        // dwt_setrxaftertxdelay(RESP_TX_TO_FINAL_RX_DLY_UUS);
-        // dwt_setrxtimeout(FINAL_RX_TIMEOUT_UUS);
-        resp_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
-        resp_msg[RESPONSE_ID_IND] = anchor_id;
-        /* Zero offset in TX buffer. */
-        data->state = RangingState::SENDING_RESPONSE;
-        tx_config = {anchor_id, RESP_MSG_SPECIAL_ID};
-        dwt_writetxdata(sizeof(resp_msg), resp_msg, 0);
-        /* Zero offset in TX buffer, ranging. */
-        dwt_writetxfctrl(sizeof(resp_msg), 0, 1);
-        dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
-        if (data->resp_tx_ts == 0) {
-            data->resp_tx_ts = dwt_readtxtimestamplo32();
-        }
-        data->start_state_time = HAL_GetTick();
+    if (data->state == RangingState::WAITING_FINAL) {
+        return;
     }
     if (data->state == RangingState::PROCESSING_RESULT) {
-        uint32_t poll_tx_ts, resp_rx_ts, final_tx_ts;
         double Ra, Rb, Da, Db, tof, distance;
         int64_t tof_dtu;
-        final_msg_get_ts(&rx_buffer[FINAL_MSG_POLL_TX_TS_IDX], &poll_tx_ts);
-        final_msg_get_ts(&rx_buffer[FINAL_MSG_RESP_RX_TS_IDX], &resp_rx_ts);
-        final_msg_get_ts(&rx_buffer[FINAL_MSG_FINAL_TX_TS_IDX], &final_tx_ts);
+        final_msg_get_ts(&rx_buffer[FINAL_MSG_POLL_TX_TS_IDX], &data->poll_tx_ts);
+        final_msg_get_ts(&rx_buffer[FINAL_MSG_RESP_RX_TS_IDX], &data->resp_rx_ts);
+        final_msg_get_ts(&rx_buffer[FINAL_MSG_FINAL_TX_TS_IDX], &data->final_tx_ts);
         data->state = RangingState::IDLE;
         data->start_state_time = HAL_GetTick();
-        Ra = static_cast<double>(resp_rx_ts - poll_tx_ts);
-        Rb = static_cast<double>(data->final_rx_ts - data->resp_tx_ts);
-        Da = static_cast<double>(final_tx_ts - resp_rx_ts);
-        Db = static_cast<double>(data->resp_tx_ts - data->poll_rx_ts);
+        // poll --> resp --> final
+        Ra = static_cast<double>(data->resp_rx_ts   - data->poll_tx_ts);  // T_round1
+        Rb = static_cast<double>(data->final_rx_ts  - data->resp_tx_ts);  // T_round2
+        Da = static_cast<double>(data->final_tx_ts  - data->resp_rx_ts);  // T_rep1
+        Db = static_cast<double>(data->resp_tx_ts   - data->poll_rx_ts);  // T_rep2
         tof_dtu = (int64)((Ra * Rb - Da * Db) / (Ra + Rb + Da + Db));
         tof = tof_dtu * DWT_TIME_UNITS;
         distance = tof * SPEED_OF_LIGHT;
-        if (distance < 0) {
-            return;
-        }
-
         /*Send computed distance to logger*/
         auto dist = static_cast<uint32_t>(distance * 1000);
-        log_data[0] = anchor_id;
+        log_data[0] = data->anchor_id;
         log_data[1] =  dist & 0xFF;
         log_data[2] = (dist >> 8) & 0xFF;
         log_data[3] = (dist >> 16) & 0xFF;
@@ -156,9 +128,7 @@ void DW1000::spin_router_for_one_anchor(uint8_t anchor_id) {
         data->poll_rx_ts = 0;
         data->resp_tx_ts = 0;
         data->final_rx_ts = 0;
-        return;
-    }
-    if (data->state == RangingState::WAITING_FINAL) {
+        data->data_valid = false;
         return;
     }
     data->state = RangingState::IDLE;
@@ -181,8 +151,30 @@ void DW1000::spin() {
         }
         return;
     }
+
     for (uint8_t i = 0; i < data_array_entry_count; i++) {
         spin_router_for_one_anchor(data_array[i].id);
+    }
+}
+
+void DW1000::process_msg(RangingData* data) {
+    if (data->state == RangingState::PROCESSING_POLL) {
+        if (data->poll_rx_ts == 0) {
+            data->poll_rx_ts = dwt_readrxtimestamplo32();
+        }
+        resp_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
+        resp_msg[RESPONSE_ID_IND] = data->anchor_id;
+        /* Zero offset in TX buffer. */
+        data->state = RangingState::SENDING_RESPONSE;
+        tx_config = {data->anchor_id, RESP_MSG_SPECIAL_ID};
+        dwt_writetxdata(sizeof(resp_msg), resp_msg, 0);
+        /* Zero offset in TX buffer, ranging. */
+        dwt_writetxfctrl(sizeof(resp_msg), 0, 1);
+        dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
+        if (data->resp_tx_ts == 0) {
+            data->resp_tx_ts = dwt_readtxtimestamplo32();
+        }
+        data->start_state_time = HAL_GetTick();
     }
 }
 
@@ -215,6 +207,7 @@ void DW1000::rx_complete_cb(const dwt_cb_data_t *cb_data) {
         data->poll_rx_ts = dwt_readrxtimestamplo32();
         data->state = RangingState::PROCESSING_POLL;
         data->start_state_time = HAL_GetTick();
+        process_msg(data);
         return;
     case FINL_MSG_SPECIAL_ID:
         sender_id = rx_buffer[POLL_FIN_ID_IND];
