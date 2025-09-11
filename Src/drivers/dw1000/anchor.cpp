@@ -116,12 +116,10 @@ void DW1000::process_msg(RangingData* data) {
                         data->resp_rx_ts);
 
         /* Compute final message transmission time. See NOTE 10 below. */
-        uint64_t final_tx_time = 0;
-        get_system_timestamp(final_tx_time);
-        // dwt_setdelayedtrxtime(final_tx_time);
+        uint8_t final_tx_time[5] = {0};
+        dwt_readsystime(final_tx_time);
+        memcpy(&final_msg[FINAL_MSG_FINAL_TX_TS_IDX], final_tx_time, FINAL_MSG_TS_LEN);
         /* Final TX timestamp is the transmission time we programmed plus the TX antenna delay. */
-        // uint64_t final_tx_ts = (((uint64)(final_tx_time & 0xFFFFFFFEUL)) << 8) + TX_ANT_DLY;
-        final_msg_set_ts(&final_msg[FINAL_MSG_FINAL_TX_TS_IDX], final_tx_time);
         dwt_writetxdata(sizeof(final_msg), final_msg, 0); /* Zero offset in TX buffer. */
         dwt_writetxfctrl(sizeof(final_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
         dwt_starttx(DWT_START_TX_IMMEDIATE);
