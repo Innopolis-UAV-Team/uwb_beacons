@@ -77,7 +77,7 @@ uint64_t get_tx_timestamp_u64(void);
  *
  * @return  64-bit value of the read time-stamp.
  */
-uint64_t get_rx_timestamp_u64(void);
+void get_rx_timestamp_u64(uint64_t ts);
 /*! 
  * @fn final_msg_set_ts()
  *

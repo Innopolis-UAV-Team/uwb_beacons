@@ -39,16 +39,14 @@ uint64_t get_tx_timestamp_u64(void) {
  *
  * @return  64-bit value of the read time-stamp.
  */
-uint64_t get_rx_timestamp_u64(void) {
+void get_rx_timestamp_u64(uint64_t ts) {
     uint8_t ts_tab[5];
-    uint64_t ts = 0;
     int i;
     dwt_readrxtimestamp(ts_tab);
     for (i = 4; i >= 0; i--) {
         ts <<= 8;
         ts |= ts_tab[i];
     }
-    return ts;
 }
 
 /*! 

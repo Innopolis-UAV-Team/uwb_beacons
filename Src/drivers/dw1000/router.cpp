@@ -80,22 +80,27 @@ int DW1000::init(void) {
 
     /* Set delay to turn reception on after transmission of the frame. See NOTE 2 below. */
     dwt_setrxaftertxdelay(TX_TO_RX_DELAY_UUS);
+    // /* Set response frame timeout. */
+    // dwt_setrxtimeout(RX_RESP_TO_UUS);
+    /* Clear reception timeout to start next ranging process. */
+    dwt_setrxtimeout(0);
 
-    /* Set response frame timeout. */
-    dwt_setrxtimeout(RX_RESP_TO_UUS);
+    /* Activate reception immediately. */
+    dwt_rxenable(DWT_START_RX_IMMEDIATE);
     return 0;
 }
 
 void DW1000::spin_router_for_one_anchor(uint8_t anchor_id) {
-    RangingData* data = getValueById(anchor_id);
-    if (data == nullptr) {
-        return;
-    }
-    if (HAL_GetTick() - data->start_state_time > 500) {
+    RangingData* data = getDataEntryById(anchor_id);
+
+    if (HAL_GetTick() - data->start_state_time > 1000) {
         data->state = RangingState::IDLE;
     }
 
     if (data->state == RangingState::PROCESSING_POLL) {
+        if (HAL_GetTick() - last_transmission_ms < (tx_delay_ms)) {
+            return;
+        }
         uint32_t resp_tx_time;
         resp_tx_time = (data->poll_rx_ts + (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
         dwt_setdelayedtrxtime(resp_tx_time);
@@ -158,15 +163,16 @@ void DW1000::spin_router_for_one_anchor(uint8_t anchor_id) {
 void DW1000::spin() {
     if (data_array_entry_count == 0) {
         if (HAL_GetTick() - last_transmission_ms > 1000) {
-            ack_msg[ALL_MSG_SN_IDX] = 0;
+            ack_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
             /* Write frame data to DW1000 and prepare transmission. See NOTE 7 below. */
             dwt_writetxdata(sizeof(ack_msg), ack_msg, 0); /* Zero offset in TX buffer. */
             dwt_writetxfctrl(sizeof(ack_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
             /* Start transmission, indicating that a response is expected so that reception
             is enabled immediately after the frame is sent. */
-            dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
-            return;
+            dwt_starttx(DWT_START_TX_IMMEDIATE);
+            last_transmission_ms = HAL_GetTick();
         }
+        return;
     }
     for (uint8_t i = 0; i < data_array_entry_count; i++) {
         spin_router_for_one_anchor(data_array[i].id);
@@ -198,44 +204,27 @@ void DW1000::rx_complete_cb(const dwt_cb_data_t *cb_data) {
         return;
     case POLL_MSG_SPECIAL_ID:
         sender_id = rx_buffer[POLL_FIN_ID_IND];
-        data = getValueById(sender_id);
-        if (data == nullptr) {
-            RangingData ranging_data = RangingData{0, 0, 0, 0, 0, 0,
-                sender_id, IDLE, 0, false};
-            addDataEntry(sender_id, ranging_data);
-            data = getValueById(sender_id);
-        }
+        data = getDataEntryById(sender_id);
         if (data->state == RangingState::IDLE || data->state == RangingState::SENDING_ACK) {
-            data->poll_rx_ts = get_rx_timestamp_u64();
+            data->poll_rx_ts = dwt_readrxtimestamplo32();
             data->state = RangingState::PROCESSING_POLL;
             data->start_state_time = HAL_GetTick();
         }
         return;
     case FINL_MSG_SPECIAL_ID:
         sender_id = rx_buffer[POLL_FIN_ID_IND];
-        data = getValueById(sender_id);
-        if (data == nullptr) {
-            RangingData ranging_data = RangingData{0, 0, 0, 0, 0, 0,
-                sender_id, IDLE, 0, false};
-            addDataEntry(sender_id, ranging_data);
-            data = getValueById(sender_id);
-            return;
-        }
+        data = getDataEntryById(sender_id);
+
         if (data->state == RangingState::WAITING_FINAL) {
-            data->final_rx_ts = get_rx_timestamp_u64();
+            data->final_rx_ts = dwt_readrxtimestamplo32();
             data->state = RangingState::PROCESSING_RESULT;
             data->start_state_time = HAL_GetTick();
         }
         return;
     default:
         sender_id = rx_buffer[POLL_FIN_ID_IND];
-        data = getValueById(sender_id);
-        if (data == nullptr) {
-            RangingData ranging_data = RangingData{0, 0, 0, 0, 0, 0,
-                sender_id, IDLE, 0, false};
-            addDataEntry(sender_id, ranging_data);
-            return;
-        }
+        data = getDataEntryById(sender_id);
+
         break;
     }
 }
@@ -254,7 +243,10 @@ void DW1000::rx_error_cb(const dwt_cb_data_t *cb_data) {
 
 void DW1000::tx_complete_cb(const dwt_cb_data_t *cb_data) {
     (void)(cb_data);
-
+    if (data_array_entry_count == 0) {
+        last_transmission_ms = HAL_GetTick();
+        return;
+    }
     RangingData* data = getValueById(tx_anchor_id);
     switch (data->state) {
         case RangingState::SENDING_RESPONSE:
@@ -262,7 +254,7 @@ void DW1000::tx_complete_cb(const dwt_cb_data_t *cb_data) {
             data->state = RangingState::WAITING_FINAL;
             data->start_state_time = HAL_GetTick();
             break;
-            case RangingState::SENDING_ACK:
+        case RangingState::SENDING_ACK:
             data->state = RangingState::IDLE;
             data->start_state_time = HAL_GetTick();
             break;

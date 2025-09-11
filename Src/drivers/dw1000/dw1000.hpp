@@ -37,10 +37,10 @@ class DW1000 {
         SENDING_ACK,
     };
     struct RangingData {
-        uint64_t poll_tx_ts;
+        uint32_t poll_tx_ts;
         uint64_t poll_rx_ts;
         uint64_t resp_tx_ts;
-        uint64_t resp_rx_ts;
+        uint32_t resp_rx_ts;
         uint64_t final_rx_ts;
         uint64_t final_tx_ts;
         uint8_t anchor_id;
@@ -76,6 +76,17 @@ class DW1000 {
             data_array[data_array_entry_count].value = data;
             data_array_entry_count++;
         }
+    }
+
+    static RangingData* getDataEntryById(uint8_t id) {
+        RangingData * data = getValueById(id);
+        if ((data == nullptr) | (data_array_entry_count == 0)) {
+            RangingData ranging_data = RangingData{0, 0, 0, 0, 0, 0,
+                                                    id, IDLE, 0, false};
+            addDataEntry(id, ranging_data);
+            data = getValueById(id);
+        }
+        return data;
     }
 
     // static RangingState current_state;
