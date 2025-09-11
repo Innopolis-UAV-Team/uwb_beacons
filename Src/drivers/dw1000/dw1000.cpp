@@ -23,6 +23,7 @@ dwt_config_t config = {
 
 DW1000 dw1000;
 
+DW1000::TxConfig DW1000::tx_config = {0, 0};
 uint32_t DW1000::state_start_time = 0;
 DW1000::DataEntry DW1000::data_array[MAX_ENTRIES] = {};
 uint8_t DW1000::frame_seq_nb = 0;

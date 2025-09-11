@@ -67,6 +67,7 @@ the enable of the receiver, as programmed for the DW1000's wait for response fea
  * @return  64-bit value of the read time-stamp.
  */
 uint64_t get_tx_timestamp_u64(void);
+
 /*!
  * @fn get_rx_timestamp_u64()
  *
@@ -78,6 +79,7 @@ uint64_t get_tx_timestamp_u64(void);
  * @return  64-bit value of the read time-stamp.
  */
 void get_rx_timestamp_u64(uint64_t ts);
+
 /*! 
  * @fn final_msg_set_ts()
  *
@@ -89,7 +91,8 @@ void get_rx_timestamp_u64(uint64_t ts);
  *
  * @return none
  */
-void final_msg_set_ts(uint8_t *ts_field, uint64_t ts);
+void final_msg_get_ts(const uint8_t *ts_field, uint32_t *ts);
+
 /*!
  * @fn final_msg_get_ts()
  *
@@ -103,6 +106,17 @@ void final_msg_set_ts(uint8_t *ts_field, uint64_t ts);
  */
 void final_msg_get_ts(const uint8_t *ts_field, uint32_t *ts);
 
+/*!
+ * @fn get_system_timestamp()
+ *
+ * @brief Get the system time-stamp in a 64-bit variable.
+ *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
+ *
+ * @param  none
+ *
+ * @return  64-bit value of the read time-stamp.
+ */
+void get_system_timestamp(uint64_t ts);
 
 #endif  // SRC_DRIVERS_DW1000_COMMON_HPP_
 

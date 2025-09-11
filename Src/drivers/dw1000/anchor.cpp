@@ -49,7 +49,7 @@ int DW1000::init(void) {
      * performance. */
     reset_DW1000(); /* Target specific drive of RSTn line into DW1000 low for a period. */
     port_set_dw1000_slowrate();
-    if (dwt_initialise(DWT_LOADNONE) == DWT_ERROR) {
+    if (dwt_initialise(DWT_LOADUCODE) == DWT_ERROR) {
         return -1;
     }
 
@@ -93,16 +93,15 @@ void DW1000::spin() {
         /* Start transmission, indicating that a response is expected so that reception
         is enabled immediately after the frame is sent. */
         data->state = SENDING_POLL;
-        data->poll_tx_ts = dwt_readtxtimestamplo32();
         dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
         data->start_state_time = HAL_GetTick();
     }
     if (data->state == RangingState::PROCESSING_RESPONSE) {
         /* Write and send final message. See NOTE 8 below. */
         final_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
-        // while (data->resp_rx_ts == 0) {
-        //     get_rx_timestamp_u64(data->resp_rx_ts);
-        // }
+        if (data->resp_tx_ts == 0) {
+            data->resp_tx_ts = dwt_readtxtimestamplo32();
+        }
         /* Write all timestamps in the final message. See NOTE 11 below. */
         final_msg_set_ts(&final_msg[FINAL_MSG_POLL_TX_TS_IDX],
                         data->poll_tx_ts);
@@ -110,7 +109,8 @@ void DW1000::spin() {
                         data->resp_rx_ts);
 
         /* Compute final message transmission time. See NOTE 10 below. */
-        uint64_t final_tx_time = get_tx_timestamp_u64();
+        uint64_t final_tx_time = 0;
+        get_system_timestamp(final_tx_time);
         // dwt_setdelayedtrxtime(final_tx_time);
         /* Final TX timestamp is the transmission time we programmed plus the TX antenna delay. */
         // uint64_t final_tx_ts = (((uint64)(final_tx_time & 0xFFFFFFFEUL)) << 8) + TX_ANT_DLY;
@@ -205,10 +205,12 @@ void DW1000::tx_complete_cb(const dwt_cb_data_t *cb_data) {
     switch (data->state) {
         case RangingState::SENDING_POLL:
             data->state = RangingState::WAITING_RESPONSE;
+            data->poll_tx_ts = dwt_readtxtimestamplo32();
             data->start_state_time = HAL_GetTick();
             break;
-        case RangingState::SENDING_FINAL:
+            case RangingState::SENDING_FINAL:
             data->state = RangingState::IDLE;
+            data->final_tx_ts = dwt_readtxtimestamplo32();
             break;
         default:
             data->state = RangingState::IDLE;

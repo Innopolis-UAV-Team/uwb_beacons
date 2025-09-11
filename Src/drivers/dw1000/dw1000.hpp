@@ -53,6 +53,11 @@ class DW1000 {
         RangingData value;
     } DataEntry;
 
+    struct TxConfig {
+        uint8_t id;
+        uint8_t msg_type;
+    };
+    static TxConfig tx_config;
     static uint8_t frame_seq_nb;
     static DataEntry data_array[MAX_ENTRIES];
     static uint8_t data_array_entry_count;
