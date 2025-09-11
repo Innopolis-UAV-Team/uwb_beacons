@@ -85,17 +85,6 @@ void DW1000::spin() {
     if (data == nullptr) {
         return;
     }
-    if (data->state == RangingState::IDLE) {
-        poll_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
-        /* Write frame data to DW1000 and prepare transmission. See NOTE 7 below. */
-        dwt_writetxdata(sizeof(poll_msg), poll_msg, 0); /* Zero offset in TX buffer. */
-        dwt_writetxfctrl(sizeof(poll_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
-        /* Start transmission, indicating that a response is expected so that reception
-        is enabled immediately after the frame is sent. */
-        data->state = SENDING_POLL;
-        dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
-        data->start_state_time = HAL_GetTick();
-    }
 
     if (HAL_GetTick() - data->start_state_time > 500) {
         data->state = RangingState::IDLE;
@@ -157,24 +146,19 @@ void DW1000::rx_complete_cb(const dwt_cb_data_t *cb_data) {
         }
         return;
     case ACKN_MSG_SPECIAL_ID:
-        data = getValueById(ANCHOR_ID);
-        if (data == nullptr) {
-            RangingData ranging_data = RangingData{0, 0, 0, 0, 0, 0,
-                ANCHOR_ID, IDLE, 0, false};
-            addDataEntry(ANCHOR_ID, ranging_data);
-            return;
-        }
-        data->state = RangingState::IDLE;
+        poll_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
+        /* Write frame data to DW1000 and prepare transmission. See NOTE 7 below. */
+        dwt_writetxdata(sizeof(poll_msg), poll_msg, 0); /* Zero offset in TX buffer. */
+        dwt_writetxfctrl(sizeof(poll_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
+        /* Start transmission, indicating that a response is expected so that reception
+        is enabled immediately after the frame is sent. */
+        data->state = SENDING_POLL;
+        data->start_state_time = HAL_GetTick();
+        dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
         break;
     default:
         uint8_t other_id = rx_buffer[POLL_FIN_ID_IND];
-        data = getValueById(other_id);
-        if (data == nullptr) {
-            RangingData ranging_data = RangingData{0, 0, 0, 0, 0, 0,
-                rx_buffer[ALL_MSG_SN_IDX], IDLE, 0, false};
-            addDataEntry(rx_buffer[ALL_MSG_SN_IDX], ranging_data);
-            return;
-        }
+        data = getDataEntryById(other_id);
         break;
     }
 }

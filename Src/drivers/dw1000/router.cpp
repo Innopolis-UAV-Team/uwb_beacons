@@ -112,6 +112,9 @@ void DW1000::spin_router_for_one_anchor(uint8_t anchor_id) {
         tof_dtu = (int64)((Ra * Rb - Da * Db) / (Ra + Rb + Da + Db));
         tof = tof_dtu * DWT_TIME_UNITS;
         distance = tof * SPEED_OF_LIGHT;
+        if (distance < 0) {
+            return;
+        }
         /*Send computed distance to logger*/
         auto dist = static_cast<uint32_t>(distance * 1000);
         log_data[0] = data->anchor_id;
@@ -171,18 +174,14 @@ void DW1000::process_msg(RangingData* data) {
         /* Zero offset in TX buffer, ranging. */
         dwt_writetxfctrl(sizeof(resp_msg), 0, 1);
         dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
-        if (data->resp_tx_ts == 0) {
-            data->resp_tx_ts = dwt_readtxtimestamplo32();
-        }
         data->start_state_time = HAL_GetTick();
     }
 }
 
 void DW1000::rx_complete_cb(const dwt_cb_data_t *cb_data) {
-    int i;
     /* Clear local RX buffer to avoid having leftovers from previous receptions. This is not necessary but is included here to aid reading the RX
      * buffer. */
-    for (i = 0; i < FRAME_LEN_MAX; i++) {
+    for (uint8_t i = 0; i < FRAME_LEN_MAX; i++) {
         rx_buffer[i] = 0;
     }
 
@@ -219,7 +218,6 @@ void DW1000::rx_complete_cb(const dwt_cb_data_t *cb_data) {
     default:
         sender_id = rx_buffer[POLL_FIN_ID_IND];
         data = getDataEntryById(sender_id);
-
         break;
     }
 }
