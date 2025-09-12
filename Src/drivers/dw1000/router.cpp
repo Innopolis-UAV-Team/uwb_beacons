@@ -68,6 +68,9 @@ int DW1000::init(void) {
     /* Configure DW1000. See NOTE 6 below. */
     dwt_configure(&config);
 
+    /* Activate double buffering. */
+    dwt_setdblrxbuffmode(1);
+
     /* Register RX call-back. */
     dwt_setcallbacks(&tx_complete_cb, &rx_complete_cb, &rx_timeout_cb, &rx_error_cb);
 
@@ -76,10 +79,9 @@ int DW1000::init(void) {
 
     /* Set delay to turn reception on after transmission of the frame. See NOTE 2 below. */
     dwt_setrxaftertxdelay(TX_TO_RX_DELAY_UUS);
-    // /* Set response frame timeout. */
-    // dwt_setrxtimeout(RX_RESP_TO_UUS);
-    /* Clear reception timeout to start next ranging process. */
-    dwt_setrxtimeout(0);
+
+    /* Set response frame timeout. */
+    dwt_setrxtimeout(RX_RESP_TO_UUS);
 
     /* Activate reception immediately. */
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
@@ -93,9 +95,6 @@ void DW1000::spin_router_for_one_anchor(uint8_t anchor_id) {
         data->state = RangingState::IDLE;
     }
 
-    if (data->state == RangingState::WAITING_FINAL) {
-        return;
-    }
     if (data->state == RangingState::PROCESSING_RESULT) {
         double Ra, Rb, Da, Db, tof, distance;
         int64_t tof_dtu;
@@ -134,8 +133,6 @@ void DW1000::spin_router_for_one_anchor(uint8_t anchor_id) {
         data->data_valid = false;
         return;
     }
-    data->state = RangingState::IDLE;
-    return;
 }
 
 void DW1000::spin() {
@@ -149,7 +146,11 @@ void DW1000::spin() {
             is enabled immediately after the frame is sent. */
             tx_config = {0, ACKN_MSG_SPECIAL_ID};
 
-            dwt_starttx(DWT_START_TX_IMMEDIATE);
+            auto res = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
+            if (res != DWT_SUCCESS) {
+                logger.log("TX FAILED");
+                return;
+            }
             last_transmission_ms = HAL_GetTick();
         }
         return;
@@ -179,8 +180,12 @@ void DW1000::process_msg(RangingData* data) {
 }
 
 void DW1000::rx_complete_cb(const dwt_cb_data_t *cb_data) {
+    /* Perform manual RX re-enabling. See NOTE 5 below. */
+    auto rx_time = dwt_readrxtimestamplo32();
+    dwt_rxenable(DWT_START_RX_IMMEDIATE | DWT_NO_SYNC_PTRS);
     /* Clear local RX buffer to avoid having leftovers from previous receptions. This is not necessary but is included here to aid reading the RX
      * buffer. */
+
     for (uint8_t i = 0; i < FRAME_LEN_MAX; i++) {
         rx_buffer[i] = 0;
     }
@@ -203,7 +208,7 @@ void DW1000::rx_complete_cb(const dwt_cb_data_t *cb_data) {
     case POLL_MSG_SPECIAL_ID:
         sender_id = rx_buffer[POLL_FIN_ID_IND];
         data = getDataEntryById(sender_id);
-        data->poll_rx_ts = dwt_readrxtimestamplo32();
+        data->poll_rx_ts = rx_time;
         data->state = RangingState::PROCESSING_POLL;
         data->start_state_time = HAL_GetTick();
         process_msg(data);
@@ -211,7 +216,7 @@ void DW1000::rx_complete_cb(const dwt_cb_data_t *cb_data) {
     case FINL_MSG_SPECIAL_ID:
         sender_id = rx_buffer[POLL_FIN_ID_IND];
         data = getDataEntryById(sender_id);
-        data->final_rx_ts = dwt_readrxtimestamplo32();
+        data->final_rx_ts = rx_time;
         data->state = RangingState::PROCESSING_RESULT;
         data->start_state_time = HAL_GetTick();
         return;
@@ -224,12 +229,14 @@ void DW1000::rx_complete_cb(const dwt_cb_data_t *cb_data) {
 
 void DW1000::rx_timeout_cb(const dwt_cb_data_t *cb_data) {
     (void)(cb_data);
+    dwt_rxenable(DWT_START_RX_IMMEDIATE);
     /* Set corresponding inter-frame delay. */
     tx_delay_ms = RX_TO_TX_DELAY_MS;
 }
 
 void DW1000::rx_error_cb(const dwt_cb_data_t *cb_data) {
     (void)(cb_data);
+    dwt_rxenable(DWT_START_RX_IMMEDIATE);
     /* Set corresponding inter-frame delay. */
     tx_delay_ms = RX_ERR_TX_DELAY_MS;
 }

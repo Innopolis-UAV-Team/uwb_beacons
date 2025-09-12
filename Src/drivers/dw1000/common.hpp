@@ -52,7 +52,7 @@ the enable of the receiver, as programmed for the DW1000's wait for response fea
 #define FINAL_RX_TIMEOUT_UUS 3300
 
 #define ACKN_MSG_SPECIAL_ID 0x41
-#define RESP_MSG_SPECIAL_ID  0x10
+#define RESP_MSG_SPECIAL_ID 0x10
 #define POLL_MSG_SPECIAL_ID 0x21
 #define FINL_MSG_SPECIAL_ID 0x23
 

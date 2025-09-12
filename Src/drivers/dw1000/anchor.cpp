@@ -6,9 +6,7 @@
 
 #include "dw1000.hpp"
 #include "common.hpp"
-
-/* Index to access the sequence number of the blink frame in the tx_msg array. */
-#define BLINK_FRAME_SN_IDX 1
+#include "../uart_logger/logger.hpp"
 
 #ifndef ANCHOR_ID
 #define ANCHOR_ID 0x1
@@ -77,10 +75,6 @@ int DW1000::init(void) {
 }
 
 void DW1000::spin() {
-    if (HAL_GetTick() - last_transmission_ms < (tx_delay_ms)) {
-        return;
-    }
-
     RangingData* data = getValueById(ANCHOR_ID);
     if (data == nullptr) {
         return;
@@ -88,6 +82,19 @@ void DW1000::spin() {
 
     if (HAL_GetTick() - data->start_state_time > 500) {
         data->state = RangingState::IDLE;
+        poll_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
+        /* Write frame data to DW1000 and prepare transmission. See NOTE 7 below. */
+        dwt_writetxdata(sizeof(poll_msg), poll_msg, 0); /* Zero offset in TX buffer. */
+        dwt_writetxfctrl(sizeof(poll_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
+        /* Start transmission, indicating that a response is expected so that reception
+        is enabled immediately after the frame is sent. */
+        data->state = SENDING_POLL;
+        data->start_state_time = HAL_GetTick();
+        auto res = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
+        if (res != DWT_SUCCESS) {
+            logger.log("TX FAILED");
+            return;
+        }
     }
 }
 
@@ -105,13 +112,23 @@ void DW1000::process_msg(RangingData* data) {
                         data->resp_rx_ts);
 
         /* Compute final message transmission time. See NOTE 10 below. */
-        uint8_t final_tx_time[5] = {0};
-        dwt_readsystime(final_tx_time);
-        memcpy(&final_msg[FINAL_MSG_FINAL_TX_TS_IDX], final_tx_time, FINAL_MSG_TS_LEN);
+        // uint8_t final_tx_time[5] = {0};
+        // dwt_readsystime(final_tx_time);
+        // memcpy(&final_msg[FINAL_MSG_FINAL_TX_TS_IDX], final_tx_time, FINAL_MSG_TS_LEN);
+
+        data->final_tx_ts = (data->resp_rx_ts + (RESP_RX_TO_FINAL_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
+        dwt_setdelayedtrxtime(data->final_tx_ts);
+        memcpy(&final_msg[FINAL_MSG_FINAL_TX_TS_IDX], &data->final_tx_ts, FINAL_MSG_TS_LEN);
+
         /* Final TX timestamp is the transmission time we programmed plus the TX antenna delay. */
         dwt_writetxdata(sizeof(final_msg), final_msg, 0); /* Zero offset in TX buffer. */
         dwt_writetxfctrl(sizeof(final_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
-        dwt_starttx(DWT_START_TX_IMMEDIATE);
+        // dwt_starttx(DWT_START_TX_IMMEDIATE);
+        dwt_starttx(DWT_START_TX_DELAYED);
+
+        /* Activate reception immediately. See NOTE 3 below. */
+        dwt_rxenable(DWT_START_RX_IMMEDIATE);
+
         data->state = RangingState::SENDING_FINAL;
         data->start_state_time = HAL_GetTick();
         data->resp_rx_ts = 0;
@@ -122,7 +139,9 @@ void DW1000::rx_complete_cb(const dwt_cb_data_t *cb_data) {
     /* Clear local RX buffer to avoid having leftovers from previous receptions. This is not necessary but is included here to aid reading the RX
      * buffer. */
     memset(rx_buffer, 0, sizeof(rx_buffer));
-
+    auto rx_time = dwt_readrxtimestamplo32();
+    /* Activate reception immediately. See NOTE 3 below. */
+    dwt_rxenable(DWT_START_RX_IMMEDIATE | DWT_NO_SYNC_PTRS);
     /* A frame has been received, copy it to our local buffer. */
     if (cb_data->datalength <= FRAME_LEN_MAX) {
         dwt_readrxdata(rx_buffer, cb_data->datalength, 0);
@@ -137,15 +156,14 @@ void DW1000::rx_complete_cb(const dwt_cb_data_t *cb_data) {
         data = getValueById(ANCHOR_ID);
         if (data->state == RangingState::WAITING_RESPONSE) {
             uint8_t response_id = rx_buffer[RESPONSE_ID_IND];
-            if (response_id != ANCHOR_ID) {
-                return;
+            if (response_id == ANCHOR_ID) {
+                data->resp_rx_ts = rx_time;
+                data->state = RangingState::PROCESSING_RESPONSE;
+                process_msg(data);
+                data->start_state_time = HAL_GetTick();
             }
-            data->resp_rx_ts = dwt_readrxtimestamplo32();
-            data->state = RangingState::PROCESSING_RESPONSE;
-            process_msg(data);
-            data->start_state_time = HAL_GetTick();
         }
-        return;
+        break;
     case ACKN_MSG_SPECIAL_ID:
         poll_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
         /* Write frame data to DW1000 and prepare transmission. See NOTE 7 below. */
@@ -162,12 +180,16 @@ void DW1000::rx_complete_cb(const dwt_cb_data_t *cb_data) {
         data = getDataEntryById(other_id);
         break;
     }
+
+
 }
 
 void DW1000::rx_timeout_cb(const dwt_cb_data_t *cb_data) {
     (void)(cb_data);
     /* Set corresponding inter-frame delay. */
     tx_delay_ms = RX_TO_TX_DELAY_MS;
+    dwt_rxenable(DWT_START_RX_IMMEDIATE);
+
     RangingData* data = getValueById(ANCHOR_ID);
     if (data == nullptr) {
         return;
@@ -179,6 +201,8 @@ void DW1000::rx_error_cb(const dwt_cb_data_t *cb_data) {
     (void)(cb_data);
     /* Set corresponding inter-frame delay. */
     tx_delay_ms = RX_ERR_TX_DELAY_MS;
+    dwt_rxenable(DWT_START_RX_IMMEDIATE);
+
     RangingData* data = getValueById(ANCHOR_ID);
     if (data == nullptr) {
         return;
