@@ -17,6 +17,40 @@ extern dwt_config_t config;
 const uint8_t POLL_FIN_ID_IND = 8;
 const uint8_t RESPONSE_ID_IND = 6;
 
+enum RangingState {
+    IDLE = 0,
+    SENDING_POLL,
+    PROCESSING_POLL,
+    WAITING_RESPONSE,
+    SENDING_RESPONSE,
+    PROCESSING_RESPONSE,
+    WAITING_FINAL,
+    SENDING_FINAL,
+    PROCESSING_RESULT,
+    SENDING_ACK,
+};
+struct RangingData {
+    uint32_t poll_tx_ts;
+    uint32_t poll_rx_ts;
+    uint32_t resp_tx_ts;
+    uint32_t resp_rx_ts;
+    uint32_t final_rx_ts;
+    uint32_t final_tx_ts;
+    uint8_t anchor_id;
+    RangingState state;
+    uint32_t start_state_time;
+    bool data_valid;
+};
+typedef struct {
+    int id;
+    RangingData value;
+} DataEntry;
+
+struct TxConfig {
+    uint8_t id;
+    uint8_t msg_type;
+};
+
 class DW1000 {
  public:
     int init();
@@ -24,45 +58,12 @@ class DW1000 {
     static const uint8_t MAX_ENTRIES = 20;
 
  private:
-    enum RangingState {
-        IDLE = 0,
-        SENDING_POLL,
-        PROCESSING_POLL,
-        WAITING_RESPONSE,
-        SENDING_RESPONSE,
-        PROCESSING_RESPONSE,
-        WAITING_FINAL,
-        SENDING_FINAL,
-        PROCESSING_RESULT,
-        SENDING_ACK,
-    };
-    struct RangingData {
-        uint32_t poll_tx_ts;
-        uint32_t poll_rx_ts;
-        uint32_t resp_tx_ts;
-        uint32_t resp_rx_ts;
-        uint32_t final_rx_ts;
-        uint32_t final_tx_ts;
-        uint8_t anchor_id;
-        RangingState state;
-        uint32_t start_state_time;
-        bool data_valid;
-    };
-    typedef struct {
-        int id;
-        RangingData value;
-    } DataEntry;
-
-    struct TxConfig {
-        uint8_t id;
-        uint8_t msg_type;
-    };
     static TxConfig tx_config;
     static uint8_t frame_seq_nb;
     static DataEntry data_array[MAX_ENTRIES];
     static uint8_t data_array_entry_count;
 
-    static void process_msg(RangingData* data);
+    static inline void process_msg(RangingData* data);
     /*
     * @fn getValueById()
     * @brief Get the value of the entry with the given ID
@@ -77,7 +78,7 @@ class DW1000 {
         }
         return nullptr;
     }
-    static void addDataEntry(uint8_t id, RangingData data) {
+    static inline void addDataEntry(uint8_t id, RangingData data) {
         if (data_array_entry_count < MAX_ENTRIES) {
             data_array[data_array_entry_count].id = id;
             data_array[data_array_entry_count].value = data;

@@ -77,14 +77,18 @@ int DW1000::init(void) {
     /* Enable wanted interrupts (TX confirmation, RX good frames, RX timeouts and RX errors). */
     dwt_setinterrupt(DWT_INT_TFRS | DWT_INT_RFCG | DWT_INT_RFTO | DWT_INT_RXPTO | DWT_INT_RPHE | DWT_INT_RFCE | DWT_INT_RFSL | DWT_INT_SFDT, 1);
 
-    /* Set delay to turn reception on after transmission of the frame. See NOTE 2 below. */
-    dwt_setrxaftertxdelay(TX_TO_RX_DELAY_UUS);
-
-    /* Set response frame timeout. */
     dwt_setrxtimeout(RX_RESP_TO_UUS);
 
     /* Activate reception immediately. */
-    dwt_rxenable(DWT_START_RX_IMMEDIATE);
+    // dwt_rxenable(DWT_START_RX_IMMEDIATE);
+    // /* Set delay to turn reception on after transmission of the frame. See NOTE 2 below. */
+    // dwt_setrxaftertxdelay(TX_TO_RX_DELAY_UUS);
+
+    // /* Set response frame timeout. */
+    // dwt_setrxtimeout(RX_RESP_TO_UUS);
+
+    // /* Activate reception immediately. */
+    // dwt_rxenable(DWT_START_RX_IMMEDIATE);
     return 0;
 }
 
@@ -146,7 +150,7 @@ void DW1000::spin() {
             is enabled immediately after the frame is sent. */
             tx_config = {0, ACKN_MSG_SPECIAL_ID};
 
-            auto res = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
+            auto res = dwt_starttx(DWT_START_TX_IMMEDIATE);
             if (res != DWT_SUCCESS) {
                 logger.log("TX FAILED");
                 return;

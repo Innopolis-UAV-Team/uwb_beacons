@@ -16,7 +16,7 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0 -g -DDEBUG")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g -DDEBUG")
 endif()
-add_definitions(-DDWT_API_ERROR_CHECK=1)
+
 if (USE_ANCHOR)
     set(TARGET_NAME "anchor")
     add_definitions(-DANCHOR)
@@ -41,12 +41,10 @@ FILE(GLOB ldFile            ${stm32cubeMxProjectPath}/*_FLASH.ld)
 FILE(GLOB coreSources       ${stm32cubeMxProjectPath}/Core/Src/*)
 FILE(GLOB driversSources    ${stm32cubeMxProjectPath}/Drivers/*/*.c
                             ${stm32cubeMxProjectPath}/Drivers/*/*/*.c
-                            ${stm32cubeMxProjectPath}/Drivers/Middlewares/decawave/examples/*/*.c
                             ${stm32cubeMxProjectPath}/Drivers/*/*/*/*.c)
 FILE(GLOB startupFile       ${stm32cubeMxProjectPath}/*.s
-                            ${stm32cubeMxProjectPath}/Core/Startup/*.s
+                            ${stm32cubeMxProjectPath}/Core/Startup/*.s)
 
-                            )
 FILE(GLOB middlewaresSources ${stm32cubeMxProjectPath}/Drivers/Middlewares/*/*/*.c)
 
 include(${ROOT_DIR}/toolchain-stm32f103xB.cmake)
@@ -63,12 +61,8 @@ list(APPEND CUBE_MX_HEADERS
                 ${stm32cubeMxProjectPath}/Core/Inc
                 ${stm32cubeMxProjectPath}/Drivers/API
                 ${stm32cubeMxProjectPath}/Drivers/CMSIS/Include
-                ${stm32cubeMxProjectPath}/Drivers/Middlewares/decawave/compiler
                 ${stm32cubeMxProjectPath}/Drivers/Middlewares/decawave/decadriver
                 ${stm32cubeMxProjectPath}/Drivers/Middlewares/decawave/platform
-                ${stm32cubeMxProjectPath}/Drivers/Middlewares/SEGGER_RTT/Config
-                ${stm32cubeMxProjectPath}/Drivers/Middlewares/SEGGER_RTT/Syscalls
-                ${stm32cubeMxProjectPath}/Drivers/Middlewares/SEGGER_RTT/RTT
                 ${stm32cubeMxProjectPath}/Drivers/CMSIS/Device/ST/STM32F1xx/Include
                 ${stm32cubeMxProjectPath}/Drivers/STM32F1xx_HAL_Driver/Inc
                 ${stm32cubeMxProjectPath}/Drivers/STM32F1xx_HAL_Driver/Inc/Legacy)

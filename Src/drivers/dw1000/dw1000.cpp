@@ -21,11 +21,33 @@ dwt_config_t config = {
     (1025 + 64 - 32) /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
 };
 
+// ref_values DW1000::reference = {
+//         0xC0,           /* PG_DELAY */
+//         0x25456585,     /* Power */
+//         0x81,          /* Temp */
+//         0x369           /* PG_COUNT */
+// };
+
 DW1000 dw1000;
 
-DW1000::TxConfig DW1000::tx_config = {0, 0};
+// void DW1000::calibrate() {
+//     dwt_txconfig_t txconfig;
+//     int temp;
+
+//     /* Read DW1000 IC temperature for temperature compensation procedure. See NOTE 4 */
+//     temp = (dwt_readtempvbat(1) & 0xFF00) >> 8;
+
+//     /* Compensate bandwidth and power settings for temperature */
+//     txconfig.PGdly = dwt_calcbandwidthtempadj(reference.count);
+//     txconfig.power = dwt_calcpowertempadj(config.chan, reference.power, (int) (temp - reference.raw_temperature));
+
+//     /* Configure the TX frontend with the adjusted settings */
+//     dwt_configuretxrf(&txconfig);
+// }
+
+TxConfig DW1000::tx_config = {0, 0};
 uint32_t DW1000::state_start_time = 0;
-DW1000::DataEntry DW1000::data_array[MAX_ENTRIES] = {};
+DataEntry DW1000::data_array[MAX_ENTRIES] = {};
 uint8_t DW1000::frame_seq_nb = 0;
 uint8_t DW1000::data_array_entry_count = 0;
 uint8_t DW1000::poll_msg[12] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 0x00,
