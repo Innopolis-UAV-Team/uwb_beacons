@@ -14,6 +14,7 @@
 #include "stm32f103xb.h"
 #include "../uart_logger/logger.hpp"
 #include "port.h"
+#include "configs.hpp"
 
 #ifdef ANCHOR
 #define APP_NAME "Anchor V1.0"
@@ -36,12 +37,21 @@ class DW1000 {
          * performance. */
         return reset();
     }
+    void load_params();
     void spin();
+    void calibrate();
+    void calibrate_antenna_delay(uint32_t dist);
 
  private:
     int common_reset();
+    static void set_deafult_params();
     int reset();
-
+    static uint8_t calibration_step;
+    static bool calibration;
+    static int best_calibration_error;
+    static int calibration_error;
+    static ref_values reference_values;
+    static uint32_t ant_dly;
     /* Hold copy of status register state here for reference so that it can be examined at a debug breakpoint. */
     static uint32_t status_reg;
     static uint8_t rx_buffer[RX_BUF_LEN];

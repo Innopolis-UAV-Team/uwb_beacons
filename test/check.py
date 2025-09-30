@@ -88,7 +88,7 @@ def trilateration(points: dict[int, dict[str, list[float]]]) -> tuple[float, flo
                    d3=yyy,
                    L2=L2,
                    L3=L3)
-    
+
     #res: Tuple[float, float, float] = solve_position(d1=points[idl1]['data'][0],
     #               d2=points[idl2]['data'][0],
     #               d3=points[idl3]['data'][0],

@@ -230,6 +230,9 @@ void DW1000::spin() {
     log_data[7] = 0xFF;
     log_data[8] = 0;
     logc(log_data, 9);
+    if (calibration) {
+        calibrate_antenna_delay(dist);
+    }
 }
 
 /*

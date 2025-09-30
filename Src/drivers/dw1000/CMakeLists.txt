@@ -8,6 +8,7 @@ endif()
 set(SRC_DRIVERS_DW1000_DIR ${CMAKE_CURRENT_LIST_DIR})
 
 include(${ROOT_DIR}/Src/peripheral/spi/CMakeLists.txt)
+include(${ROOT_DIR}/Src/peripheral/flash/CMakeLists.txt)
 include(${ROOT_DIR}/Src/drivers/uart_logger/CMakeLists.txt)
 
 if(USE_ANCHOR)
