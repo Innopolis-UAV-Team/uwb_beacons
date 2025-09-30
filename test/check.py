@@ -29,9 +29,9 @@ c2 = 4.33136513e-01
 
 # Многолатерация по 3 якорям, можно добавить сколько угодно в формате id: (x, y, z)
 positions: dict[int, tuple[float, float, float]] = {
-    1: (0, 0, 0),
-    6: (L2, 0, 0),
-    7: (0, L3, 0),
+    idl1: (0, 0, 0),
+    idl2: (L2, 0, 0),
+    idl3: (0, L3, 0),
 }
 
 def solve_multilateration(points: dict[int, dict[str, list[float]]]) -> tuple[float, float, float] | None:
@@ -138,7 +138,6 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float|None = None
                         messages[message.id]['last_message'] = time.time()
 
                     if time.time() - last_message < 0.2:
-
                         continue
                     last_message = time.time()
                     # all_messages_str = ""
@@ -147,16 +146,16 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float|None = None
                     row = {}
 
                     res = solve_multilateration(messages)
-                    # res = trilateration(messages)
 
                     for id, data in messages.items():
                         if time.time() - data['last_message'] > 10:
                             data['data'] = []
                             continue
                         row[f"{id}_pts"] = str(len(data['data']))
-                        row[f"{id}_mean"] = int(mean(data['data'])) if len(data['data']) > 0 else 0
+                        row[f"{id}_mean"] = str(int(mean(data['data']))
+                                                if len(data['data']) > 0 else 0)
                         #row[f"{id}_cor"] = round((row[f"{id}_mean"]/1000.0 - calibrated_qubic(a, b, c, d, row[f"{id}_mean"]/1000.0))*1000)
-                        row[f"{id}_cor"] = round((row[f"{id}_mean"]/1000.0 - calibrated_quad(a2, b2, c2, row[f"{id}_mean"]/1000.0))*1000)
+                        row[f"{id}_cor"] = round((int(row[f"{id}_mean"])/1000.0 - calibrated_quad(a2, b2, c2, int(row[f"{id}_mean"])/1000.0))*1000)
                         messages[id]['data'] = []
                     # sort the keys
                     keys = sorted(row.keys())
@@ -165,7 +164,7 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float|None = None
                         string += f"res: x={res[0]:.2f} y={res[1]:.2f} z={res[2]:.2f} "
                     for i, key in enumerate(keys):
                         string += f"{key}: {row[key]}\t"
-                    #print(string)
+                    print(string)
                 except struct.error as e:
                     print(e)
                     print("wrong format: ", response)
