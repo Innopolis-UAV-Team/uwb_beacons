@@ -60,9 +60,10 @@ void DW1000::spin() {
 
     /* We assume that the transmission is achieved correctly,
     poll for reception of a frame or error/timeout. See NOTE 9 below. */
+    uint32_t start_time = HAL_GetTick();
     while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) &
         (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {
-        if (status_reg & SYS_STATUS_ALL_RX_ERR) {
+        if (HAL_GetTick() - start_time > 100) {
             init();
             return;
         }
@@ -108,8 +109,8 @@ void DW1000::spin() {
     final_tx_time = (resp_rx_ts + (RESP_RX_TO_FINAL_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
     dwt_setdelayedtrxtime(final_tx_time);
 
-    /* Final TX timestamp is the transmission time we programmed plus the TX antenna delay. */
-    final_tx_ts = (((uint64)(final_tx_time & 0xFFFFFFFEUL)) << 8) + TX_ANT_DLY;
+            /* Final TX timestamp is the transmission time we programmed plus the TX antenna delay. */
+    final_tx_ts = (((uint64)(final_tx_time & 0xFFFFFFFEUL)) << 8) + ant_dly;
 
     /* Write all timestamps in the final message. See NOTE 11 below. */
     final_msg_set_ts(&tx_final_msg[FINAL_MSG_POLL_TX_TS_IDX], poll_tx_ts);

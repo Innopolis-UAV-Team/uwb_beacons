@@ -22,6 +22,8 @@ __attribute__((noreturn)) void application_entry_point() {
         }
     }
 
+    dw1000.set_calibration();
+
     HAL_GPIO_WritePin(GPIOA, LED1_Pin, GPIO_PIN_SET);
     while (true) {
         HAL_GPIO_TogglePin(GPIOA, LED2_Pin);

@@ -145,7 +145,9 @@ void DW1000::spin() {
     /* If dwt_starttx() returns an error, abandon this ranging exchange
     and proceed to the next one. See NOTE 11 below. */
     if (ret == DWT_ERROR) {
-        logs("F\n");
+        if (calibration) {
+            calibrate_antenna_delay(INT32_MAX);
+        }
         return;
     }
 

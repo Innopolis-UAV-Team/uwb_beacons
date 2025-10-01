@@ -39,19 +39,25 @@ class DW1000 {
     }
     void load_params();
     void spin();
-    void calibrate();
-    void calibrate_antenna_delay(uint32_t dist);
+    void set_calibration() {
+        calibration = true;
+        calibration_step = 10;
+        logger.log("CALIBRATION STARTED");
+    }
 
  private:
+    int reset();
+    void calibrate();
+    void calibrate_antenna_delay(uint32_t dist);
     int common_reset();
     static void set_deafult_params();
-    int reset();
     static uint8_t calibration_step;
     static bool calibration;
     static int best_calibration_error;
     static int calibration_error;
     static ref_values reference_values;
     static uint32_t ant_dly;
+    static uint16_t calibration_frames_counter;
     /* Hold copy of status register state here for reference so that it can be examined at a debug breakpoint. */
     static uint32_t status_reg;
     static uint8_t rx_buffer[RX_BUF_LEN];

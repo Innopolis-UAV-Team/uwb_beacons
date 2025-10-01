@@ -4,9 +4,9 @@
  * Author: Anastasiia Stepanova <asiiapine@gmail.com>
 */
 
-#include "dw1000/dw1000.hpp"
-#include "dw1000/parameters.hpp"
-#include "dw1000/configs.hpp"
+#include "../dw1000/dw1000.hpp"
+#include "../dw1000/parameters.hpp"
+#include "../dw1000/configs.hpp"
 #include "../uart_logger/logger.hpp"
 #include "peripheral/flash/flash.h"
 
@@ -23,7 +23,7 @@ DW1000 dw1000;
 // /* Default antenna delay values for 64 MHz PRF. See NOTE 1 below. */
 // #define TX_ANT_DLY 16436
 // #define RX_ANT_DLY 16436
-char FLASH_NAME[] = "DCW";
+const char FLASH_NAME_STR[] = "DCW";
 
 #define CALIBRATION_DST    8140  // mm
 #define ALL_MSG_COMMON_LEN 10
@@ -56,6 +56,12 @@ uint8_t final_msg[24] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 0x00, 0x23, 0
 
 uint32_t DW1000::status_reg = 0;
 uint8_t DW1000::frame_seq_nb = 0;
+uint32_t DW1000::ant_dly = 0;
+int DW1000::calibration_error = 0;
+bool DW1000::calibration = false;
+int DW1000::best_calibration_error = INT32_MAX;
+uint16_t DW1000::calibration_frames_counter = 0;
+uint8_t DW1000::calibration_step = 10;
 
 uint8_t DW1000::rx_buffer[RX_BUF_LEN] = {};
 
@@ -123,7 +129,7 @@ void DW1000::calibrate() {
     load_params();
     if (reference_values.raw_temperature == 0) {
         flashLock();
-        flashWrite(reinterpret_cast<uint8_t*>(FLASH_NAME),
+        flashWrite(reinterpret_cast<const uint8_t*>(FLASH_NAME_STR),
                     get_param_offset(ParametersNames::FLASH_NAME), PARAMS_SIZE);
         flashUnlock();
         /* Read DW1000 IC temperature for temperature compensation procedure. See NOTE 3 */
@@ -155,12 +161,16 @@ void DW1000::calibrate() {
 
 void DW1000::calibrate_antenna_delay(uint32_t dist) {
     calibration_error += dist - CALIBRATION_DST;
-    if (frame_seq_nb < 1000) {
+    calibration_frames_counter++;
+
+    if (calibration_frames_counter < 1000) {
+        HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
         return;
     }
-
-    calibration_error /= frame_seq_nb;
+    HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, GPIO_PIN_SET);
+    calibration_error /= calibration_frames_counter;
     if (calibration_error < best_calibration_error) {
+        logger.log("NEW BEST");
         best_calibration_error = calibration_error;
         flashWrite(reinterpret_cast<uint8_t*>(&best_calibration_error),
                 get_param_offset(ParametersNames::BEST_CALIBRATION_ERROR), PARAMS_SIZE);
@@ -185,7 +195,7 @@ void DW1000::set_deafult_params() {
     reference_values.count = 0;
     save_reference_values(reference_values);
     flashLock();
-    flashWrite(reinterpret_cast<uint8_t*>(FLASH_NAME),
+    flashWrite(reinterpret_cast<const uint8_t*>(FLASH_NAME_STR),
                 get_param_offset(ParametersNames::FLASH_NAME), PARAMS_SIZE);
     flashWrite(reinterpret_cast<uint8_t*>(&ant_dly),
                 get_param_offset(ParametersNames::ANTENNA_DELAY), PARAMS_SIZE);
@@ -202,7 +212,7 @@ void DW1000::load_params() {
         return;
     }
 
-    if (strcmp(param_name, FLASH_NAME) == 0) {
+    if (strcmp(param_name, FLASH_NAME_STR) == 0) {
         /* Read antenna delay */
         res = flashRead(reinterpret_cast<uint8_t*>(&ant_dly),
         get_param_offset(ParametersNames::ANTENNA_DELAY), PARAMS_SIZE);
