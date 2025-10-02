@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This is a simple RTK implementation for the DW-1000 UWB radio. It is based on the [DW1000 library](https://usermanual.wiki/Pdf/DW1000SoftwareAPIGuiderev2p4.1120642274.pdf).
+This is a simple RTK implementation for the DW-1000 UWB radio. It is based on the [DW1000 library](https://usermanual.wiki/Pdf/DW1000SoftwareAPIGuiderev2p4.1120642274.pdf) and [DW1000 user guide](https://www.sunnywale.com/uploadfile/2021/1230/DW1000%20User%20Manual_Awin.pdf).
 
 ## Usage
 
@@ -10,13 +10,13 @@ The RTK utilizes two UWB devices type: a base station (router) and a tag (anchor
 To build the code for the router, run the following command:
 
 ```bash
-make router
+make router-upload
 ```
 
 To build the code for the tag, select the anchor ID (default is 1) and run the following command:
 
 ```bash
-make anchor ID=1
+make ID=1 anchor-upload
 ```
 
 The base station will listen for the tag and send the RTK solution via UART.
@@ -28,18 +28,18 @@ The UART is used to send the distance to all found tags. The distance is sent in
 The format is:
 
 ```
-| uint8_t | uint16_t | uint16_t |
+| uint8_t | uint32_t | uint32_t |
 | ------- | -------- | -------- |
-| TAG ID  | DISTANCE | 0xFF00 - message end |
+| TAG ID  | DISTANCE | 0xFFFFFF00 - message end |
 ```
 
 Example:
 
 ```
-real distance: 100 cm
+real distance: 100 mm
 1,100,0xFF00
 in hex:
-0x1, 0x00, 0x64, 0xFF, 0x00
+0x1, 0x00, 0x00 0x00 0x64, 0xFF, 0xFF, 0xFF, 0x00
 ```
 
 # Data parsing
@@ -70,6 +70,10 @@ The format of the statistics file is:
 | id | count | mean | min | max | std | median | real_value | error | error_pct |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | 2442 | 536.3611793611793 | 31.0 | 635.0 | 23.25916398894732 | 536.5 | 500.0 | 36.361179361179325 | 7.272235872235864 |
+
+# Data parsing
+
+To parse the messages use Message class from the [common folder](test/common/serial_messages.py)
 
 > [!NOTE]
 > The baudrate which is set by user in the software will be doubled because of some error in the hardware/clock configuration.
