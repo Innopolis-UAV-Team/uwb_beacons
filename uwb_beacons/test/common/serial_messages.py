@@ -1,4 +1,6 @@
 import struct
+from typing import Optional
+
 
 class Message:
     def __init__(self, data: bytes):
@@ -24,7 +26,7 @@ class CircularBuffer:
         self.size = 0
         self.tail = 0
 
-    def append(self, item: bytes | None):
+    def append(self, item: Optional[bytes]):
         if item is None:
             return
         items = item.split(b'\xff\xff\xff\x00')
@@ -37,7 +39,7 @@ class CircularBuffer:
         if self.size > len(self.buffer):
             self.size = len(self.buffer)
 
-    def pop(self) -> bytes | None:
+    def pop(self) -> Optional[bytes]:
         if self.size == 0:
             return None
         item = self.buffer[self.tail]

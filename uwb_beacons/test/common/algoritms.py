@@ -1,6 +1,6 @@
 
 import math
-from typing import Tuple
+from typing import Dict, Tuple
 import localization as lx
 
 
@@ -40,7 +40,8 @@ def calibrated_qubic(a, b, c, d, x):
     return a * x**3 + b * x**2 + c * x + d
 
 
-def multilateration(raw_data: dict[int, float], anchor_positions: dict[int, Tuple[float, float, float]], z_sign: int = +1) -> Tuple[float, float, float]:
+def multilateration(
+    raw_data: Dict[int, float], anchor_positions: Dict[int, Tuple[float, float, float]], z_sign: int = +1) -> Tuple[float, float, float]:
     """
     Trilateration algorithm
     :param raw_data: raw data from the sensor
