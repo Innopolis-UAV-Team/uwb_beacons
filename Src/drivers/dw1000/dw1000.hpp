@@ -40,9 +40,11 @@ class DW1000 {
     void load_params();
     void spin();
     void set_calibration() {
+        load_params();
+        ant_dly = 0;
         calibration = true;
         calibration_step = 10;
-        logger.log("CALIBRATION STARTED");
+        logger.log("CALIBRATION STARTED\n");
     }
 
  private:

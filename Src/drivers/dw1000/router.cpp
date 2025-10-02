@@ -84,7 +84,7 @@ int DW1000::reset() {
 
 void DW1000::spin() {
     /* Clear reception timeout to start next ranging process. */
-    dwt_setrxtimeout(0);
+    dwt_setrxtimeout(10000);
 
     /* Activate reception immediately. */
     dwt_rxenable(DWT_START_RX_IMMEDIATE);

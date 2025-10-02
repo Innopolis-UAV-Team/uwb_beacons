@@ -20,7 +20,6 @@
 
 uint32_t HAL_GetTick();
 
-static uint8_t* flashGetPointer();
 static int8_t flashWaitForLastOperation(uint32_t timeout);
 static void flashPageErase(uint32_t page_address);
 static void flashProgramHalfWord(uint32_t address, uint16_t data);
@@ -63,10 +62,6 @@ int8_t flashErase(uint32_t start_page_idx, uint32_t num_of_pages) {
     return status;
 }
 
-static uint8_t* flashGetPointer() {
-    return (uint8_t*) FLASH_START_ADDR;
-}
-
 int8_t flashWrite(const uint8_t* data, size_t offset, size_t size) {
     int8_t status = flashWaitForLastOperation(FLASH_TIMEOUT_VALUE);
 
@@ -74,10 +69,10 @@ int8_t flashWrite(const uint8_t* data, size_t offset, size_t size) {
         return status;
     }
     size_t n_half_words = (size + 1)/2;
-
+    size_t flash_data_start_addr = FLASH_START_ADDR + FLASH_PAGE_SIZE * FLASH_PAGE_INDEX;
     for (size_t i = 0; i < n_half_words; i += 1) {
         const uint16_t half_word = (data[2U*i + 1]) << 8 | data[2U*i];
-        flashProgramHalfWord(offset + 2U*i, half_word);
+        flashProgramHalfWord(flash_data_start_addr + offset + 2U*i, half_word);
 
         status = flashWaitForLastOperation(FLASH_TIMEOUT_VALUE);
         if (status < 0) {
@@ -93,9 +88,10 @@ size_t flashRead(uint8_t* data, size_t offset, size_t bytes_to_read) {
     if (data == NULL) {
         return 0;
     }
+    const uint8_t* flash_data_start_addr = (uint8_t*)(FLASH_START_ADDR +
+                                                        FLASH_PAGE_SIZE * FLASH_PAGE_INDEX);
 
-    const uint8_t* rom = &(flashGetPointer()[offset]);
-    memcpy(data, rom, bytes_to_read);
+    memcpy(data, flash_data_start_addr + offset, bytes_to_read);
     return bytes_to_read;
 }
 

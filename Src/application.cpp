@@ -23,10 +23,13 @@ __attribute__((noreturn)) void application_entry_point() {
     }
 
     dw1000.set_calibration();
-
-    HAL_GPIO_WritePin(GPIOA, LED1_Pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(GPIOA, LED1_Pin, GPIO_PIN_RESET);
+    static uint32_t last_toggle_ms = 0;
     while (true) {
-        HAL_GPIO_TogglePin(GPIOA, LED2_Pin);
+        if (HAL_GetTick() - last_toggle_ms > 500) {
+            last_toggle_ms = HAL_GetTick();
+            HAL_GPIO_TogglePin(GPIOA, LED2_Pin);
+        }
         logger.spin();
         dw1000.spin();
         HAL_IWDG_Refresh(&hiwdg);

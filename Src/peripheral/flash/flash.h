@@ -13,6 +13,8 @@
 #include <stddef.h>
 
 #define FLASH_START_ADDR            0x08000000
+#define NUM_PAGES                   64U   // 32 KB
+#define FLASH_PAGE_INDEX            NUM_PAGES - 2U
 
 #ifdef __cplusplus
 extern "C" {

@@ -4,6 +4,10 @@
  * Author: Anastasiia Stepanova <asiiapine@gmail.com>
 */
 
+#include <cstdio>
+#include <climits>
+
+#include <cstdlib>
 #include "../dw1000/dw1000.hpp"
 #include "../dw1000/parameters.hpp"
 #include "../dw1000/configs.hpp"
@@ -62,6 +66,7 @@ bool DW1000::calibration = false;
 int DW1000::best_calibration_error = INT32_MAX;
 uint16_t DW1000::calibration_frames_counter = 0;
 uint8_t DW1000::calibration_step = 10;
+ref_values DW1000::reference_values = {};
 
 uint8_t DW1000::rx_buffer[RX_BUF_LEN] = {};
 
@@ -102,10 +107,10 @@ int DW1000::common_reset() {
     reset_DW1000(); /* Target specific drive of RSTn line into DW1000 low for a period. */
     port_set_dw1000_slowrate();
     if (dwt_initialise(DWT_LOADUCODE) == DWT_ERROR) {
-        logger.log("INIT FAILED");
+        logger.log("RESET FAILED\n");
         return -1;
     }
-    logger.log("INIT SUCCESS");
+    logger.log("RESET SUCCESS\n");
     port_set_dw1000_fastrate();
 
     /* Configure DW1000. See NOTE 7 below. */
@@ -128,10 +133,11 @@ void DW1000::calibrate() {
 
     load_params();
     if (reference_values.raw_temperature == 0) {
-        flashLock();
+        flashUnlock();
         flashWrite(reinterpret_cast<const uint8_t*>(FLASH_NAME_STR),
                     get_param_offset(ParametersNames::FLASH_NAME), PARAMS_SIZE);
-        flashUnlock();
+        flashLock();
+
         /* Read DW1000 IC temperature for temperature compensation procedure. See NOTE 3 */
         reference_values.raw_temperature = (dwt_readtempvbat(1) & 0xFF00) >> 8;
         reference_values.PGdly = txconfig.PGdly;
@@ -139,7 +145,7 @@ void DW1000::calibrate() {
         reference_values.count = dwt_calcpgcount(txconfig.PGdly);
         auto res = save_reference_values(reference_values);
         if (res < 4 * PARAMS_SIZE) {
-            logger.log("ERROR");
+            logger.log("ERROR\n");
             return;
         }
         dwt_softreset();
@@ -160,33 +166,57 @@ void DW1000::calibrate() {
 }
 
 void DW1000::calibrate_antenna_delay(uint32_t dist) {
-    calibration_error += dist - CALIBRATION_DST;
-    calibration_frames_counter++;
-
-    if (calibration_frames_counter < 1000) {
+    static uint32_t last_blink_ms = 0;
+    if (HAL_GetTick() - last_blink_ms > 500) {
         HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
-        return;
-    }
-    HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, GPIO_PIN_SET);
-    calibration_error /= calibration_frames_counter;
-    if (calibration_error < best_calibration_error) {
-        logger.log("NEW BEST");
-        best_calibration_error = calibration_error;
-        flashWrite(reinterpret_cast<uint8_t*>(&best_calibration_error),
-                get_param_offset(ParametersNames::BEST_CALIBRATION_ERROR), PARAMS_SIZE);
-        flashWrite(reinterpret_cast<uint8_t*>(&ant_dly),
-                get_param_offset(ParametersNames::ANTENNA_DELAY), PARAMS_SIZE);
+        last_blink_ms = HAL_GetTick();
     }
     if (ant_dly >= 100000) {
         calibration = false;
-        logger.log("CALIBRATION FINISHED");
+        calibrate();
+        logger.log("CALIBRATION FINISHED\n");
         return;
     }
+    if (dist > UINT32_MAX / 1000) {
+        calibration_frames_counter = 0;
+        calibration_error = 0;
+        ant_dly += calibration_step;
+        reset();
+        return;
+    }
+    calibration_error += abs(static_cast<int>(dist) - CALIBRATION_DST);
+    calibration_frames_counter++;
+    if (calibration_frames_counter < 1000) {
+        return;
+    }
+    calibration_error /= calibration_frames_counter;
+    logger.log("CALIBRATION STEP DONE\n");
+    if (calibration_error < best_calibration_error) {
+        char buf[64];
+        snprintf(buf, sizeof(buf), "ERR: %d BEST: %d\n", calibration_error, best_calibration_error);
+        logger.log(buf);
+        best_calibration_error = calibration_error;
+        flashLock();
+        auto res = flashWrite(reinterpret_cast<const uint8_t*>(FLASH_NAME_STR),
+                    get_param_offset(ParametersNames::FLASH_NAME), PARAMS_SIZE);
+        res = flashWrite(reinterpret_cast<uint8_t*>(&best_calibration_error),
+                get_param_offset(ParametersNames::BEST_CALIBRATION_ERROR), PARAMS_SIZE);
+        res = flashWrite(reinterpret_cast<uint8_t*>(&ant_dly),
+                get_param_offset(ParametersNames::ANTENNA_DELAY), PARAMS_SIZE);
+        (void)res;
+        flashUnlock();
+    }
+
+    calibration_frames_counter = 0;
+    calibration_error = 0;
     ant_dly += calibration_step;
-    common_reset();
+    reset();
 }
 
 void DW1000::set_deafult_params() {
+    flashUnlock();
+    flashErase(FLASH_PAGE_INDEX, 2);
+    flashLock();
     ant_dly = 16436;
     best_calibration_error = INT32_MAX;
     reference_values.PGdly = 0;
@@ -194,19 +224,23 @@ void DW1000::set_deafult_params() {
     reference_values.raw_temperature = 0;
     reference_values.count = 0;
     save_reference_values(reference_values);
-    flashLock();
+    flashUnlock();
     flashWrite(reinterpret_cast<const uint8_t*>(FLASH_NAME_STR),
                 get_param_offset(ParametersNames::FLASH_NAME), PARAMS_SIZE);
     flashWrite(reinterpret_cast<uint8_t*>(&ant_dly),
                 get_param_offset(ParametersNames::ANTENNA_DELAY), PARAMS_SIZE);
     flashWrite(reinterpret_cast<uint8_t*>(&best_calibration_error),
                 get_param_offset(ParametersNames::BEST_CALIBRATION_ERROR), PARAMS_SIZE);
-    flashUnlock();
+    flashLock();
+    char flash_name[4];
+        flashRead(reinterpret_cast<uint8_t*>(flash_name),
+                    get_param_offset(ParametersNames::FLASH_NAME), 4);
 }
 
 void DW1000::load_params() {
     char param_name[4];
-    int res = flashRead(reinterpret_cast<uint8_t*>(param_name), 0, 4);
+    int res = flashRead(reinterpret_cast<uint8_t*>(param_name),
+                        get_param_offset(ParametersNames::FLASH_NAME), 4);
     if (res != 4) {
         set_deafult_params();
         return;
@@ -220,17 +254,12 @@ void DW1000::load_params() {
             set_deafult_params();
             return;
         }
+        char buf[64];
+        snprintf(buf, sizeof(buf), "ANT: %d\n", static_cast<int>(ant_dly));
+        logger.log(buf);
         reference_values = load_reference_values();
         return;
     }
 
-    if (res != 4) {
-        set_deafult_params();
-        return;
-    }
-    res = flashRead(reinterpret_cast<uint8_t*>(&best_calibration_error),
-                get_param_offset(ParametersNames::BEST_CALIBRATION_ERROR), PARAMS_SIZE);
-    if (res != 4) {
-        best_calibration_error = INT32_MAX;
-    }
+    set_deafult_params();
 }
