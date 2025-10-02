@@ -1,7 +1,7 @@
 <launch>
   <node pkg="uwb_localizer" type="uwb_localizer.py" name="uwb_localizer" output="screen">
     <param name="port" value="/dev/ttyUSB0"/>
-    <param name="baud" value="230400"/>
+    <param name="baud" value="460800/>
     <param name="frame_id" value="map"/>
     <rosparam>
       anchors:
