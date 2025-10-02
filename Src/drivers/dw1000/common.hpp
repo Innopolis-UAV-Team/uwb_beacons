@@ -51,13 +51,6 @@ uint8_t final_msg[24] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 0x00, 0x23, 0
 
 uint32_t DW1000::status_reg = 0;
 uint8_t DW1000::frame_seq_nb = 0;
-// uint64_t DW1000::poll_tx_ts = {};  // tx|rx changed
-// uint64_t DW1000::resp_tx_ts = {};
-// uint64_t DW1000::final_tx_ts = {};
-
-// uint64_t DW1000::poll_rx_ts = {};  // tx|rx changed
-// uint64_t DW1000::resp_rx_ts = {};
-// uint64_t DW1000::final_rx_ts = {};
 uint8_t DW1000::rx_buffer[RX_BUF_LEN] = {};
 
 
