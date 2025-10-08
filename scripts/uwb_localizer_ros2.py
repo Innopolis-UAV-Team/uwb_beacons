@@ -1,0 +1,228 @@
+#!/usr/bin/env python3
+import rclpy
+from rclpy.node import Node
+import serial
+import struct
+import numpy as np
+from geometry_msgs.msg import PoseStamped
+from sensor_msgs.msg import Range
+from std_msgs.msg import String
+from scipy.optimize import least_squares
+
+import sys, os
+# sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
+from uwb_localizer.algoritms import multilateration
+from uwb_localizer.serial_messages import CircularBuffer, Message
+
+def calibrated_linear(raw, a, b):
+    return a * raw + b
+
+def calibrated_quadratic(raw, a, b, c):
+    return a * raw**2 + b * raw + c
+
+def calibrated_cubic(raw, a, b, c, d):
+    return a * raw**3 + b * raw**2 + c * raw + d
+
+class UWBLocalizer(Node):
+    def __init__(self):
+        super().__init__('uwb_localizer')
+        
+        # Declare parameters (will be loaded from config file)
+        self.declare_parameter('port')
+        self.declare_parameter('baud')
+        self.declare_parameter('frame_id')
+        self.declare_parameter('calibration')
+        self.declare_parameter('calib_params')
+        self.declare_parameter('z_sign')
+        self.declare_parameter('timer_frequency')
+        self.declare_parameter('min_range')
+        self.declare_parameter('max_range')
+        self.declare_parameter('field_of_view')
+        self.declare_parameter('radiation_type')
+        self.declare_parameter('timeout')
+        
+        # Get parameter values
+        port = self.get_parameter('port').get_parameter_value().string_value
+        baud = self.get_parameter('baud').get_parameter_value().integer_value
+        self.frame_id = self.get_parameter('frame_id').get_parameter_value().string_value
+        
+        # Set default anchor positions (will be overridden by config file if provided)
+        self.anchor_positions = {
+            "1": [0.0, 0.0, 0.0],
+            "2": [3.0, 0.0, 0.0],
+            "3": [0.0, 3.0, 0.0],
+            "4": [3.0, 3.0, 2.0],
+        }
+        self.calib_type = self.get_parameter('calibration').get_parameter_value().string_value
+        self.calib_params = self.get_parameter('calib_params').get_parameter_value().double_array_value
+        self.z_sign = self.get_parameter('z_sign').get_parameter_value().integer_value
+        timer_frequency = self.get_parameter('timer_frequency').get_parameter_value().double_value
+        self.min_range = self.get_parameter('min_range').get_parameter_value().double_value
+        self.max_range = self.get_parameter('max_range').get_parameter_value().double_value
+        self.field_of_view = self.get_parameter('field_of_view').get_parameter_value().double_value
+        self.radiation_type = self.get_parameter('radiation_type').get_parameter_value().integer_value
+        timeout = self.get_parameter('timeout').get_parameter_value().double_value
+        
+        # Anchor positions are already set above
+        
+        # Validate parameters
+        self._validate_parameters()
+        
+        self.get_logger().info(f'Anchor positions: {self.anchor_positions}')
+        self.get_logger().info(f'Calibration type: {self.calib_type}, params: {self.calib_params}')
+
+        try:
+            self.ser = serial.Serial(port, baud, timeout=timeout)
+            self.get_logger().info(f'Connected to UWB device on {port} at {baud} baud')
+        except Exception as e:
+            self.get_logger().error(f'Failed to connect to UWB device: {e}')
+            raise
+
+        # Create publishers
+        self.pose_pub = self.create_publisher(PoseStamped, 'uwb/pose', 10)
+        self.range_pub = self.create_publisher(Range, 'uwb/ranges', 10)
+        self.debug_pub = self.create_publisher(String, 'uwb/debug', 10)
+
+        # Create timer for main loop
+        timer_period = 1.0 / timer_frequency
+        self.timer = self.create_timer(timer_period, self.spin_once)
+        
+        # Initialize buffer and ranges
+        self.buffer = bytearray()
+        self.ranges = {}
+        self.last_msg_time = {}
+
+    def _parse_anchor_positions_from_array(self, anchor_array):
+        """Parse anchor positions from string array format to dictionary"""
+        anchor_dict = {}
+        # This method would handle string array format if needed
+        # For now, return default since we're using dict format
+        return {
+            "1": [0.0, 0.0, 0.0],
+            "2": [3.0, 0.0, 0.0],
+            "3": [0.0, 3.0, 0.0],
+            "4": [3.0, 3.0, 2.0],
+        }
+
+    def _validate_parameters(self):
+        """Validate parameter values"""
+        # Validate calibration type
+        valid_calib_types = ['linear', 'quadratic', 'cubic', 'none']
+        if self.calib_type not in valid_calib_types:
+            self.get_logger().warn(f'Invalid calibration type: {self.calib_type}. Using linear.')
+            self.calib_type = 'linear'
+        
+        # Validate calibration parameters based on type
+        if self.calib_type == 'linear' and len(self.calib_params) != 2:
+            self.get_logger().warn('Linear calibration requires 2 parameters. Using defaults.')
+            self.calib_params = [1.0, 0.0]
+        elif self.calib_type == 'quadratic' and len(self.calib_params) != 3:
+            self.get_logger().warn('Quadratic calibration requires 3 parameters. Using defaults.')
+            self.calib_params = [0.0, 1.0, 0.0]
+        elif self.calib_type == 'cubic' and len(self.calib_params) != 4:
+            self.get_logger().warn('Cubic calibration requires 4 parameters. Using defaults.')
+            self.calib_params = [0.0, 0.0, 1.0, 0.0]
+        
+        # Validate anchor positions
+        if len(self.anchor_positions) < 3:
+            self.get_logger().error('At least 3 anchor positions are required for trilateration')
+            raise ValueError('Insufficient anchor positions')
+        
+        # Validate range parameters
+        if self.min_range >= self.max_range:
+            self.get_logger().warn('min_range should be less than max_range. Adjusting.')
+            self.max_range = self.min_range + 1.0
+
+    def parse_message(self, data):
+        if len(data) < 5:
+            return None, None
+        anchor_id = data[0]
+        raw_val = struct.unpack("<I", data[1:5])[0]
+        return anchor_id, raw_val
+
+    def calibrate(self, raw):
+        if self.calib_type == "linear":
+            return calibrated_linear(raw, *self.calib_params)
+        elif self.calib_type == "quadratic":
+            return calibrated_quadratic(raw, *self.calib_params)
+        elif self.calib_type == "cubic":
+            return calibrated_cubic(raw, *self.calib_params)
+        else:
+            return raw
+
+    def multilaterate(self, ranges):
+        if len(ranges) < 3:
+            return None
+        return multilateration(ranges, self.anchor_positions, self.z_sign)
+
+    def get_current_time(self):
+        return self.get_clock().now().to_msg().sec
+
+    def spin_once(self):
+        try:
+            # Read available data
+            for id, time in self.last_msg_time.items():
+                if time < self.get_current_time() - 0.5:
+                    self.ranges[id] = None
+                    self.last_msg_time[id] = 0.0
+
+            if self.ser.in_waiting > 0:
+                b = self.ser.read(1)
+                if b:
+                    self.buffer.extend(b)
+                    if self.buffer.endswith(b"\xff\xff\xff\x00"):
+                        packet = self.buffer[:-4]
+                        self.buffer.clear()
+                        anchor_id, raw_val = self.parse_message(packet)
+                        self.last_msg_time[anchor_id] = self.get_current_time()
+
+                        if anchor_id is not None:
+                            dist = self.calibrate(raw_val)
+                            self.ranges[anchor_id] = dist
+
+                            # Publish range message
+                            msg = Range()
+                            msg.header.stamp = self.get_clock().now().to_msg()
+                            msg.header.frame_id = f"anchor_{anchor_id}"
+                            msg.radiation_type = self.radiation_type
+                            msg.field_of_view = self.field_of_view
+                            msg.min_range = self.min_range
+                            msg.max_range = self.max_range
+                            msg.range = dist
+                            self.range_pub.publish(msg)
+
+                            # Calculate and publish position
+                            pos = self.multilaterate(self.ranges)
+                            if pos is not None:
+                                pose = PoseStamped()
+                                pose.header.stamp = self.get_clock().now().to_msg()
+                                pose.header.frame_id = self.frame_id
+                                pose.pose.position.x = pos[0]
+                                pose.pose.position.y = pos[1]
+                                pose.pose.position.z = pos[2] * self.z_sign
+                                self.pose_pub.publish(pose)
+
+                            # Publish debug message
+                            debug_msg = String()
+                            debug_msg.data = f"Anchor {anchor_id}, raw={raw_val}, dist={dist:.3f}"
+                            self.debug_pub.publish(debug_msg)
+        except Exception as e:
+            self.get_logger().error(f'Error in spin_once: {e}')
+
+def main(args=None):
+    rclpy.init(args=args)
+    
+    try:
+        node = UWBLocalizer()
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
+        print(f'Error: {e}')
+    finally:
+        if rclpy.ok():
+            rclpy.shutdown()
+
+if __name__ == "__main__":
+    main()

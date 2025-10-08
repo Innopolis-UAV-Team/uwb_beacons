@@ -1,0 +1,62 @@
+services:
+  uwb-localizer:
+    build: .
+    container_name: uwb_localizer_ros2
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=0
+      - DISPLAY=${DISPLAY}
+    volumes:
+      # Mount the serial device (adjust path as needed)
+      - /dev/ttyUSB0:/dev/ttyUSB0:rw
+      # Mount X11 socket for GUI applications (if needed)
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      # Mount workspace for development (optional)
+      - ./:/ros2_ws/src/uwb_localizer:rw
+    devices:
+      # Ensure access to serial devices
+      - /dev/ttyUSB0:/dev/ttyUSB0
+    network_mode: host
+    privileged: true
+    command: >
+      ros2 launch uwb_localizer uwb_localizer_ros2.launch.py
+
+  # Optional: Add RViz for visualization
+  rviz:
+    image: ros:humble-desktop
+    container_name: uwb_rviz
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=0
+      - DISPLAY=${DISPLAY}
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    network_mode: host
+    depends_on:
+      - uwb-localizer
+    command: rviz2
+    profiles:
+      - gui  # Only start with --profile gui
+
+  # Optional: Add rosbag2 for data recording
+  rosbag:
+    image: ros:humble-ros-base
+    container_name: uwb_rosbag
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=0
+    volumes:
+      - ./data:/data:rw
+    network_mode: host
+    depends_on:
+      - uwb-localizer
+    command: >
+      bash -c "
+      mkdir -p /data/uwb_logs &&
+      ros2 bag record -o /data/uwb_logs/uwb_session
+      /uwb/pose
+      /uwb/ranges
+      /uwb/debug
+      "
+    profiles:
+      - recording  # Only start with --profile recording

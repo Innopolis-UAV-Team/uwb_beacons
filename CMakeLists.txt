@@ -1,18 +1,43 @@
-cmake_minimum_required(VERSION 3.0.2)
+cmake_minimum_required(VERSION 3.8)
 project(uwb_localizer)
 
-find_package(catkin REQUIRED COMPONENTS
-  rospy
-  std_msgs
-  geometry_msgs
-  sensor_msgs
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+# find dependencies
+find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
+find_package(rclpy REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+
+# Install Python modules
+ament_python_install_package(${PROJECT_NAME})
+
+# Install Python executables
+install(PROGRAMS
+  uwb_localizer/uwb_localizer_ros2.py
+  DESTINATION lib/${PROJECT_NAME}
 )
 
-catkin_package()
-
-include_directories(${catkin_INCLUDE_DIRS})
-
-catkin_install_python(PROGRAMS
-  scripts/uwb_localizer.py
-  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+# Install launch files
+install(DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME}/
 )
+
+# Install config files
+install(DIRECTORY
+  config
+  DESTINATION share/${PROJECT_NAME}/
+  OPTIONAL
+)
+
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  ament_lint_auto_find_test_dependencies()
+endif()
+
+ament_package()

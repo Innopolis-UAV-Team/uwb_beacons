@@ -1,0 +1,56 @@
+# Example UWB Localizer Configuration File
+# Copy this file to uwb_localizer_params.yaml and modify as needed
+# This file is ignored by git to prevent accidental commits of personal configurations
+
+uwb_localizer:
+  ros__parameters:
+    # Serial communication parameters
+    port: "/dev/ttyUSB0"  # Change to your UWB device port
+    baud: 230400          # Adjust based on your UWB system
+    timeout: 1.0
+    
+    # Frame and coordinate system
+    frame_id: "map"       # Change to your preferred frame (e.g., "robot_base", "room_map")
+    z_sign: 1             # Use -1 if you need to flip the Z-axis
+    
+    # Timer frequency (Hz) - higher frequency for more responsive updates
+    timer_frequency: 100.0  # Reduce if you experience high CPU usage
+    
+    # Range sensor parameters
+    min_range: 0.0        # Minimum valid range in meters
+    max_range: 100.0      # Maximum valid range in meters
+    field_of_view: 0.1    # Field of view in radians
+    radiation_type: 1     # 1 = INFRARED, 2 = LASER, 3 = SONAR
+    
+    # Calibration parameters - CRITICAL: Adjust these based on your UWB system
+    calibration: "linear"  # Options: linear, quadratic, cubic, none
+    calib_params: [0.001, 0.0]  # [scale_factor, offset] for linear calibration
+    
+    # Anchor positions (x, y, z in meters) - CRITICAL: Set these to your actual anchor positions
+    # At least 3 anchors are required for trilateration
+    # Example setup for a 4m x 4m room:
+    anchors:
+      "1": [0.0, 0.0, 0.0]      # Anchor 1: Bottom-left corner
+      "2": [4.0, 0.0, 0.0]      # Anchor 2: Bottom-right corner
+      "3": [0.0, 4.0, 0.0]      # Anchor 3: Top-left corner
+      "4": [4.0, 4.0, 2.5]      # Anchor 4: Top-right corner, elevated
+    
+    # Alternative setup for a larger room (8m x 6m):
+    # anchors:
+    #   "1": [0.0, 0.0, 0.0]      # Bottom-left
+    #   "2": [8.0, 0.0, 0.0]      # Bottom-right
+    #   "3": [0.0, 6.0, 0.0]      # Top-left
+    #   "4": [8.0, 6.0, 3.0]      # Top-right, elevated
+    #   "5": [4.0, 3.0, 2.0]      # Center, elevated (optional 5th anchor)
+
+# Calibration Notes:
+# - Linear: distance = calib_params[0] * raw_value + calib_params[1]
+# - Quadratic: distance = calib_params[0] * raw_value^2 + calib_params[1] * raw_value + calib_params[2]
+# - Cubic: distance = calib_params[0] * raw_value^3 + calib_params[1] * raw_value^2 + calib_params[2] * raw_value + calib_params[3]
+# - None: distance = raw_value (no calibration applied)
+
+# Anchor Setup Tips:
+# 1. Measure anchor positions accurately using a tape measure or laser distance meter
+# 2. Ensure anchors are at different heights when possible for better 3D positioning
+# 3. Place anchors to form a good geometric configuration (avoid colinear anchors)
+# 4. Test with known positions to verify accuracy

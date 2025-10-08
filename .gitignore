@@ -6,3 +6,6 @@ test/*/data
 test/*/figs
 *.csv
 *.log
+
+# Configuration files - users should copy the example and customize
+config/uwb_localizer_params.yaml
