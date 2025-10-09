@@ -16,7 +16,6 @@ const uint8_t RX_ANCHOR_ID_IND = 8;
 const uint8_t TX_ANCHOR_ID_IND = 6;
 
 /* Index to access some of the fields in the frames involved in the process. */
-#define ALL_MSG_SN_IDX 2
 #define FINAL_MSG_POLL_TX_TS_IDX 10
 #define FINAL_MSG_RESP_RX_TS_IDX 14
 #define FINAL_MSG_FINAL_TX_TS_IDX 18
@@ -109,6 +108,7 @@ void DW1000::spin() {
     if (frame_len <= RX_BUFFER_LEN) {
         dwt_readrxdata(rx_buffer, frame_len, 0);
     }
+    uint8_t rx_frame_seq_nb = rx_buffer[ALL_MSG_SN_IDX];
 
     rx_buffer[ALL_MSG_SN_IDX] = 0;
 
@@ -174,18 +174,18 @@ void DW1000::spin() {
 
     /* Check that the frame is a final message sent by "anchor1".
         * As the sequence number field of the frame is not used in this example, it can be zeroed to ease the validation of the frame. */
+    if ((rx_frame_seq_nb + 1)!= rx_buffer[ALL_MSG_SN_IDX]) {
+        return;
+    }
     rx_buffer[ALL_MSG_SN_IDX] = 0;
     bool got_final = false;
-    uint32_t waiting_time = HAL_GetTick();
+
     while (!got_final) {
         if (memcmp(rx_buffer, rx_final_msg, ALL_MSG_COMMON_LEN) == 0) {
             got_final = true;
             break;
         }
         if (memcmp(rx_buffer, rx_final_msg, ALL_MSG_COMMON_LEN) != 0) {
-            continue;
-        }
-        if (HAL_GetTick() - waiting_time < 5) {
             return;
         }
     }
