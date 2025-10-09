@@ -24,10 +24,13 @@ static uint64_t poll_tx_ts;
 static uint64_t resp_rx_ts;
 static uint64_t final_tx_ts;
 
+const uint8_t RX_ID_IND = 8;
+const uint8_t TX_ID_IND = 6;
+
 /* Frames used in the ranging process. */
-static uint8 tx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', ANCHOR_ID, 0x21, 0, 0};
-static uint8 rx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', ANCHOR_ID, 'W', 'A', 0x10, 0x02, 0, 0, 0, 0};
-static uint8 tx_final_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', ANCHOR_ID,
+static uint8 tx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', ID, 0x21, 0, 0};
+static uint8 rx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', ID, 'W', 'A', 0x10, 0x02, 0, 0, 0, 0};
+static uint8 tx_final_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', ID,
                                 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 int DW1000::reset() {
@@ -88,6 +91,9 @@ void DW1000::spin() {
     /* Check that the frame is the expected response from the companion "DS TWR responder" example.
         * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
     rx_buffer[ALL_MSG_SN_IDX] = 0;
+    uint8_t id = rx_buffer[RX_ID_IND];
+    rx_resp_msg[RX_ID_IND] = id;
+    tx_final_msg[TX_ID_IND] = id;
     if (memcmp(rx_buffer, rx_resp_msg, ALL_MSG_COMMON_LEN) != 0) {
         return;
     }

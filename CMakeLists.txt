@@ -17,13 +17,14 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g -DDEBUG")
 endif()
 
+if(NOT DEFINED ID)
+    set(ID "1")  # default value
+endif()
+add_definitions(-DID=${ID})
+
 if (USE_ANCHOR)
     set(TARGET_NAME "anchor")
     add_definitions(-DANCHOR)
-    if(NOT DEFINED ANCHOR_ID)
-        set(ANCHOR_ID "1")  # default value
-    endif()
-    add_definitions(-DANCHOR_ID=${ANCHOR_ID})
 else()
     set(TARGET_NAME "router")
     add_definitions(-DROUTER)
