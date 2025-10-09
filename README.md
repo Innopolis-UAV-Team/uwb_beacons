@@ -7,16 +7,16 @@ This is a simple RTK implementation for the DW-1000 UWB radio. It is based on th
 ## Usage
 
 The RTK utilizes two UWB devices type: a base station (router) and a tag (anchor).
-To build the code for the router, run the following command:
+To build the code for the router, select the anchor ID (default is 1) and run the following command:
 
 ```bash
-make router-upload
+make ID=1 router-upload
 ```
 
 To build the code for the tag, select the anchor ID (default is 1) and run the following command:
 
 ```bash
-make ID=1 anchor-upload
+make ID=2 anchor-upload
 ```
 
 The base station will listen for the tag and send the RTK solution via UART.
