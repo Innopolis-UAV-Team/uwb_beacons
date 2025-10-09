@@ -178,13 +178,16 @@ void DW1000::spin() {
     bool got_final = false;
     uint32_t waiting_time = HAL_GetTick();
     while (!got_final) {
+        if (memcmp(rx_buffer, rx_final_msg, ALL_MSG_COMMON_LEN) == 0) {
+            got_final = true;
+            break;
+        }
         if (memcmp(rx_buffer, rx_final_msg, ALL_MSG_COMMON_LEN) != 0) {
             continue;
         }
         if (HAL_GetTick() - waiting_time < 5) {
             return;
         }
-        got_final = true;
     }
     uint32_t poll_tx_ts, resp_rx_ts, final_tx_ts;
     uint32_t poll_rx_ts_32, resp_tx_ts_32, final_rx_ts_32;
