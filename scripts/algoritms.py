@@ -55,20 +55,21 @@ def multilateration(
         raise ValueError("Not enough data for trilateration")
     if len(anchor_positions) < 3:
         raise ValueError("Not enough anchor positions for trilateration")
-    if len(raw_data) != len(anchor_positions):
-        raise ValueError("Raw data and anchor positions must have the same length")
 
-    anchors_ids = list(raw_data.keys())
-    anchors_ids.sort()
-    raw_data_ids = list(raw_data.keys())
-    raw_data_ids.sort()
-    anchors_ids = list(set(anchors_ids) & set(raw_data_ids))
-    if len(anchors_ids) < 3:
+    matched_ids = list(set(raw_data.keys()) & set(anchor_positions.keys()))
+    if len(matched_ids) < 3:
         raise ValueError("Not enough common anchors for trilateration")
+
     t, label = P.add_target()
 
-    for id in anchors_ids:
+    for id in matched_ids:
         P.add_anchor(id, anchor_positions[id])
         t.add_measure(id, raw_data[id])
     P.solve()
+
+    if len(matched_ids) == 3:
+        # If there are only 3 anchors, use the z_sign parameter to choose the solution
+        if t.loc.z * z_sign < 0:
+            t.loc.z = -t.loc.z
+
     return t.loc.x, t.loc.y, t.loc.z

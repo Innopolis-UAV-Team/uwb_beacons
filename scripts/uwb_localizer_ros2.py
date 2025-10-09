@@ -41,12 +41,13 @@ class UWBLocalizer(Node):
         self.declare_parameter('field_of_view')
         self.declare_parameter('radiation_type')
         self.declare_parameter('timeout')
-        
+        self.declare_parameter('publication_frequency')
+
         # Get parameter values
         port = self.get_parameter('port').get_parameter_value().string_value
         baud = self.get_parameter('baud').get_parameter_value().integer_value
         self.frame_id = self.get_parameter('frame_id').get_parameter_value().string_value
-        
+
         # Set default anchor positions (will be overridden by config file if provided)
         self.anchor_positions = {
             "1": [0.0, 0.0, 0.0],
@@ -63,7 +64,7 @@ class UWBLocalizer(Node):
         self.field_of_view = self.get_parameter('field_of_view').get_parameter_value().double_value
         self.radiation_type = self.get_parameter('radiation_type').get_parameter_value().integer_value
         timeout = self.get_parameter('timeout').get_parameter_value().double_value
-        
+        self.publication_period = 1 / self.get_parameter('publication_frequency').get_parameter_value().double_value
         # Anchor positions are already set above
         
         # Validate parameters
@@ -87,11 +88,13 @@ class UWBLocalizer(Node):
         # Create timer for main loop
         timer_period = 1.0 / timer_frequency
         self.timer = self.create_timer(timer_period, self.spin_once)
-        
+
         # Initialize buffer and ranges
-        self.buffer = bytearray()
+        # self.buffer = bytearray()
         self.ranges = {}
         self.last_msg_time = {}
+        self.last_publication_time = 0.0
+        self.buffer = CircularBuffer(100)
 
     def _parse_anchor_positions_from_array(self, anchor_array):
         """Parse anchor positions from string array format to dictionary"""
@@ -134,14 +137,20 @@ class UWBLocalizer(Node):
             self.get_logger().warn('min_range should be less than max_range. Adjusting.')
             self.max_range = self.min_range + 1.0
 
-    def parse_message(self, data):
+        # Validate publication frequency
+        if self.publication_period <= 0:
+            self.get_logger().warn('publication_frequency should be greater than 0. Adjusting.')
+            self.publication_period = 0.1
+
+
+    def parse_message(self, data: bytearray) -> tuple[int, float]|tuple[None, None]:
         if len(data) < 5:
             return None, None
         anchor_id = data[0]
-        raw_val = struct.unpack("<I", data[1:5])[0]
+        raw_val = struct.unpack("<I", data[1:5])[0] / 1000.0  # Convert mm to meters
         return anchor_id, raw_val
 
-    def calibrate(self, raw):
+    def calibrate(self, raw: float) -> float:
         if self.calib_type == "linear":
             return calibrated_linear(raw, *self.calib_params)
         elif self.calib_type == "quadratic":
@@ -154,59 +163,84 @@ class UWBLocalizer(Node):
     def multilaterate(self, ranges):
         if len(ranges) < 3:
             return None
-        return multilateration(ranges, self.anchor_positions, self.z_sign)
+        try:
+            return multilateration(ranges, self.anchor_positions, self.z_sign)
+        except ValueError as e:
+            self.get_logger().error(f'Error in multilateration: {e}')
+            return None
 
     def get_current_time(self):
         return self.get_clock().now().to_msg().sec
+
+    def publish_ranges(self):
+        for anchor_id, dist in self.ranges.items():
+            if dist is None:
+                continue
+            msg = Range()
+            msg.header.stamp = self.get_clock().now().to_msg()
+            msg.header.frame_id = f"anchor_{anchor_id}"
+            msg.radiation_type = self.radiation_type
+            msg.field_of_view = self.field_of_view
+            msg.min_range = self.min_range
+            msg.max_range = self.max_range
+            msg.range = dist
+            self.range_pub.publish(msg)
 
     def spin_once(self):
         try:
             # Read available data
             for id, time in self.last_msg_time.items():
-                if time < self.get_current_time() - 0.5:
+                if time < self.get_current_time() - self.publication_period * 2:
                     self.ranges[id] = None
                     self.last_msg_time[id] = 0.0
 
             if self.ser.in_waiting > 0:
-                b = self.ser.read(1)
-                if b:
-                    self.buffer.extend(b)
-                    if self.buffer.endswith(b"\xff\xff\xff\x00"):
-                        packet = self.buffer[:-4]
-                        self.buffer.clear()
-                        anchor_id, raw_val = self.parse_message(packet)
-                        self.last_msg_time[anchor_id] = self.get_current_time()
+                response = self.ser.read_until(b'\xFF\xFF\xFF\x00')
+                self.buffer.append(response)
+                if self.buffer.size == 0:
+                    return
+                if self.buffer.size < 20:
+                    return
+                for i in range(self.buffer.size):
+                    msg = self.buffer.pop()
+                    if msg is None:
+                        continue
+                    message = Message(msg)
+                    anchor_id = message.id
+                    raw_val = message.data / 1000.0  # Convert mm to meters
+                    self.last_msg_time[anchor_id] = self.get_current_time()
 
-                        if anchor_id is not None:
-                            dist = self.calibrate(raw_val)
-                            self.ranges[anchor_id] = dist
+                    if anchor_id is None:
+                        continue
 
-                            # Publish range message
-                            msg = Range()
-                            msg.header.stamp = self.get_clock().now().to_msg()
-                            msg.header.frame_id = f"anchor_{anchor_id}"
-                            msg.radiation_type = self.radiation_type
-                            msg.field_of_view = self.field_of_view
-                            msg.min_range = self.min_range
-                            msg.max_range = self.max_range
-                            msg.range = dist
-                            self.range_pub.publish(msg)
+                    dist = self.calibrate(raw_val)
+                    self.ranges[anchor_id] = dist
+                    if dist < self.min_range or dist > self.max_range:
+                        self.get_logger().warn(f'Range {dist} from anchor {anchor_id} out of bounds ({self.min_range}, {self.max_range})')
+                        self.ranges[anchor_id] = None
+                        continue
+                    # Publish debug message
+                    debug_msg = String()
+                    debug_msg.data = f'Anchor {anchor_id}: raw {raw_val:.3f} m, calibrated {dist:.3f} m'
+                    self.debug_pub.publish(debug_msg)
+                    # self.get_logger().info(f'Range {dist} from anchor {anchor_id}')
+            if self.get_clock().now().to_msg().sec - self.last_publication_time < self.publication_period:
+                return
+            self.publish_ranges()
+            self.last_publication_time = self.get_clock().now().to_msg().sec
 
-                            # Calculate and publish position
-                            pos = self.multilaterate(self.ranges)
-                            if pos is not None:
-                                pose = PoseStamped()
-                                pose.header.stamp = self.get_clock().now().to_msg()
-                                pose.header.frame_id = self.frame_id
-                                pose.pose.position.x = pos[0]
-                                pose.pose.position.y = pos[1]
-                                pose.pose.position.z = pos[2] * self.z_sign
-                                self.pose_pub.publish(pose)
+            # Calculate and publish position
+            pos = self.multilaterate(self.ranges)
+            if pos is not None:
+                pose = PoseStamped()
+                pose.header.stamp = self.get_clock().now().to_msg()
+                pose.header.frame_id = self.frame_id
+                pose.pose.position.x = pos[0]
+                pose.pose.position.y = pos[1]
+                pose.pose.position.z = pos[2] * self.z_sign
+                self.pose_pub.publish(pose)
 
-                            # Publish debug message
-                            debug_msg = String()
-                            debug_msg.data = f"Anchor {anchor_id}, raw={raw_val}, dist={dist:.3f}"
-                            self.debug_pub.publish(debug_msg)
+
         except Exception as e:
             self.get_logger().error(f'Error in spin_once: {e}')
 
