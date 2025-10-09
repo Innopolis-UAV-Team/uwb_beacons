@@ -40,6 +40,9 @@ def solve_multilateration(points: dict[int, dict[str, list[float]]]) -> tuple[fl
     :param points: Dictionary of points with id as key and distance as value.
     :return: Dictionary of points with id as key and distance as value.
     """
+    if points is None or len(points.keys()) < 3:
+        return None
+
     try:
         data: dict[int, float] = {}
         for id in points.keys():
@@ -49,6 +52,8 @@ def solve_multilateration(points: dict[int, dict[str, list[float]]]) -> tuple[fl
             if not isinstance(val, float):
                 continue
             data[id] = val
+        if len(data) < 3:
+            return None
         res: Tuple[float, float, float] =  multilateration(data, positions, z_sign=1)
         print(f"Position: x={res[0]:.2f}\t\t y={res[1]:.2f}\t\t z={res[2]:.2f}")
         return res
@@ -137,7 +142,7 @@ def check_ttl_serial(port: str, baudrate: int = 9600, timeout: float|None = None
                         messages[message.id]['data'].append(message.data)
                         messages[message.id]['last_message'] = time.time()
 
-                    if time.time() - last_message < 0.2:
+                    if time.time() - last_message < 1:
                         continue
                     last_message = time.time()
                     # all_messages_str = ""
