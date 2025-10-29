@@ -18,14 +18,13 @@ the enable of the receiver, as programmed for the DW1000's wait for response fea
 /* Receive response timeout. */
 #define RESP_RX_TIMEOUT_UUS 2700
 
-static void final_msg_set_ts(uint8_t *ts_field, uint64_t ts);
 
 static uint64_t poll_tx_ts;
 static uint64_t resp_rx_ts;
 static uint64_t final_tx_ts;
 
-const uint8_t RX_ID_IND = 8;
-const uint8_t TX_ID_IND = 6;
+const uint8_t SOURCE_ID_IND = 8;
+const uint8_t DEST_ID_IND = 6;
 
 /* Frames used in the ranging process. */
 static uint8 tx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', ID, 0x21, 0, 0};
@@ -77,26 +76,30 @@ void DW1000::spin() {
         /* Reset RX to properly reinitialise LDE operation. */
         dwt_rxreset();
     }
-    uint32 frame_len;
 
-    /* Clear good RX frame event and TX frame sent in the DW1000 status register. */
-    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
-
-    /* A frame has been received, read it into the local buffer. */
-    frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
-    if (frame_len <= RX_BUF_LEN) {
-        dwt_readrxdata(rx_buffer, frame_len, 0);
+    uint8_t n_tries = 0;
+    bool got_response = false;
+    while ((!got_response) & (n_tries < 5)) {
+        if (read_message() != 0) {
+            continue;
+        }
+        n_tries++;
+        rx_buffer[ALL_MSG_SN_IDX] = 0;
+        uint8_t id = rx_buffer[SOURCE_ID_IND];
+        rx_resp_msg[SOURCE_ID_IND] = id;
+        tx_final_msg[DEST_ID_IND] = id;
+        if (rx_buffer[DEST_ID_IND] != ID) {
+            continue;
+        }
+        if (memcmp(rx_buffer, rx_resp_msg, ALL_MSG_COMMON_LEN) != 0) {
+            continue;
+        }
+        got_response = true;
     }
-
-    /* Check that the frame is the expected response from the companion "DS TWR responder" example.
-        * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
-    rx_buffer[ALL_MSG_SN_IDX] = 0;
-    uint8_t id = rx_buffer[RX_ID_IND];
-    rx_resp_msg[RX_ID_IND] = id;
-    tx_final_msg[TX_ID_IND] = id;
-    if (memcmp(rx_buffer, rx_resp_msg, ALL_MSG_COMMON_LEN) != 0) {
+    if (!got_response) {
         return;
     }
+/* Check that the frame is the expected response from the companion "DS TWR responder" example. */
     uint32 final_tx_time;
     int ret;
 
@@ -137,72 +140,4 @@ void DW1000::spin() {
     }
     /* Execute a delay between ranging exchanges. */
     last_transition_ms = HAL_GetTick();
-}
-
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn get_tx_timestamp_u64()
- *
- * @brief Get the TX time-stamp in a 64-bit variable.
- *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
- *
- * @param  none
- *
- * @return  64-bit value of the read time-stamp.
- */
-static uint64_t get_tx_timestamp_u64(void) {
-    uint8_t ts_tab[5];
-    uint64_t ts = 0;
-    int i;
-    dwt_readtxtimestamp(ts_tab);
-    for (i = 4; i >= 0; i--) {
-        ts <<= 8;
-        ts |= ts_tab[i];
-    }
-    return ts;
-}
-
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn get_rx_timestamp_u64()
- *
- * @brief Get the RX time-stamp in a 64-bit variable.
- *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
- *
- * @param  none
- *
- * @return  64-bit value of the read time-stamp.
- */
-static uint64_t get_rx_timestamp_u64(void) {
-    uint8_t ts_tab[5];
-    uint64_t ts = 0;
-    int i;
-    dwt_readrxtimestamp(ts_tab);
-    for (i = 4; i >= 0; i--) {
-        ts <<= 8;
-        ts |= ts_tab[i];
-    }
-    return ts;
-}
-
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn final_msg_set_ts()
- *
- * @brief Fill a given timestamp field in the final message with the given value. In the timestamp fields of the final
- *        message, the least significant byte is at the lower address.
- *
- * @param  ts_field  pointer on the first byte of the timestamp field to fill
- *         ts  timestamp value
- *
- * @return none
- */
-static void final_msg_set_ts(uint8_t *ts_field, uint64_t ts) {
-    int i;
-    for (i = 0; i < FINAL_MSG_TS_LEN; i++) {
-        ts_field[i] = (uint8_t) ts;
-        ts >>= 8;
-    }
-}
-
-void final_msg_get_ts(uint8_t *ts_field, uint64_t *ts) {
-    (void) ts_field;
-    (void) ts;
 }

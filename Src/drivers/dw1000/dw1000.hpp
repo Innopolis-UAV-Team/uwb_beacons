@@ -41,7 +41,7 @@ class DW1000 {
  private:
     int common_reset();
     int reset();
-
+    int8_t read_message();
     /* Hold copy of status register state here for reference so that it can be examined at a debug breakpoint. */
     static uint32_t status_reg;
     static uint8_t rx_buffer[RX_BUF_LEN];
@@ -51,7 +51,6 @@ class DW1000 {
     static void rx_ok_cb(const dwt_cb_data_t *cb_data);
     static void rx_err_cb(const dwt_cb_data_t *cb_data);
 };
-
 
 extern DW1000 dw1000;
 

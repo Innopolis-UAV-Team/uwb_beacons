@@ -3,12 +3,14 @@
  * See <https://www.gnu.org/licenses/> for details.
  * Author: Anastasiia Stepanova <asiiapine@gmail.com>
 */
+#ifndef SRC_DRIVERS_DW1000_COMMON_HPP_
+#define SRC_DRIVERS_DW1000_COMMON_HPP_
 
 #include "dw1000.hpp"
 #include "../uart_logger/logger.hpp"
 
 /* Define the global dw1000 object */
-DW1000 dw1000;
+extern DW1000 dw1000;
 
 /* Speed of light in air, in metres per second. */
 #define SPEED_OF_LIGHT 299702547
@@ -31,48 +33,18 @@ DW1000 dw1000;
 #define RNG_DELAY_MS 10
 
 /* Default communication configuration. We use here EVK1000's default mode (mode 3). */
-dwt_config_t dw_config = {
-    2,               /* Channel number. */
-    DWT_PRF_64M,     /* Pulse repetition frequency. */
-    DWT_PLEN_1024,   /* Preamble length. Used in TX only. */
-    DWT_PAC32,       /* Preamble acquisition chunk size. Used in RX only. */
-    9,               /* TX preamble code. Used in TX only. */
-    9,               /* RX preamble code. Used in RX only. */
-    1,               /* 0 to use standard SFD, 1 to use non-standard SFD. */
-    DWT_BR_110K,     /* Data rate. */
-    DWT_PHRMODE_STD, /* PHY header mode. */
-    (1025 + 64 - 32) /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
-};
+extern dwt_config_t dw_config;
 
-uint8_t poll_msg[12] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 0x00, 0x21, 0, 0};
-uint8_t resp_msg[15] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 0x00, 'W', 'A', 0x10, 0x02, 0, 0, 0, 0};
-uint8_t final_msg[24] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 0x00, 0x23, 0, 0,
-                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+extern uint8_t poll_msg[12];
+extern uint8_t resp_msg[15];
+extern uint8_t final_msg[24];
 
-uint32_t DW1000::status_reg = 0;
-uint8_t DW1000::frame_seq_nb = 0;
-uint8_t DW1000::rx_buffer[RX_BUF_LEN] = {};
-
+/* Static member definitions - these will be defined in dw1000.cpp */
 
 /* Declaration of static functions. */
-static uint64_t get_tx_timestamp_u64(void);
-static uint64_t get_rx_timestamp_u64(void);
+uint64_t get_tx_timestamp_u64(void);
+uint64_t get_rx_timestamp_u64(void);
+void final_msg_get_ts(const uint8_t *ts_field, uint32_t *ts);
+void final_msg_set_ts(uint8_t *ts_field, uint64_t ts);
 
-int DW1000::common_reset() {
-    reset_DW1000(); /* Target specific drive of RSTn line into DW1000 low for a period. */
-    port_set_dw1000_slowrate();
-    if (dwt_initialise(DWT_LOADUCODE) == DWT_ERROR) {
-        logger.log("INIT FAILED");
-        return -1;
-    }
-    logger.log("INIT SUCCESS");
-    port_set_dw1000_fastrate();
-
-    /* Configure DW1000. See NOTE 7 below. */
-    dwt_configure(&dw_config);
-
-    /* Apply default antenna delay value. See NOTE 1 below. */
-    dwt_setrxantennadelay(RX_ANT_DLY);
-    dwt_settxantennadelay(TX_ANT_DLY);
-    return 0;
-}
+#endif  // SRC_DRIVERS_DW1000_COMMON_HPP_

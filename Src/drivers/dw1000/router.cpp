@@ -48,7 +48,6 @@ static uint8_t tx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 0x00, 'W', ID, 0
 static uint8_t rx_final_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', ID, 'V', 0x00, 0x23, 0,
                                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-static void final_msg_get_ts(const uint8_t *ts_field, uint32_t *ts);
 
 /*
  * @fn rx_ok_cb()
@@ -98,16 +97,11 @@ void DW1000::spin() {
         dwt_rxreset();
         return;
     }
-    uint32_t frame_len;
 
-    /* Clear good RX frame event in the DW1000 status register. */
-    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG);
-
-    /* A frame has been received, read it into the local buffer. */
-    frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFL_MASK_1023;
-    if (frame_len <= RX_BUFFER_LEN) {
-        dwt_readrxdata(rx_buffer, frame_len, 0);
+    if (read_message() != 0) {
+        return;
     }
+
     uint8_t rx_frame_seq_nb = rx_buffer[ALL_MSG_SN_IDX];
 
     rx_buffer[ALL_MSG_SN_IDX] = 0;
@@ -163,32 +157,32 @@ void DW1000::spin() {
         dwt_rxreset();
         return;
     }
-    /* Clear good RX frame event and TX frame sent in the DW1000 status register. */
-    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
 
-    /* A frame has been received, read it into the local buffer. */
-    frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
-    if (frame_len <= RX_BUF_LEN) {
-        dwt_readrxdata(rx_buffer, frame_len, 0);
-    }
-
-    /* Check that the frame is a final message sent by "anchor1".
-        * As the sequence number field of the frame is not used in this example, it can be zeroed to ease the validation of the frame. */
-    if ((rx_frame_seq_nb + 1)!= rx_buffer[ALL_MSG_SN_IDX]) {
-        return;
-    }
-    rx_buffer[ALL_MSG_SN_IDX] = 0;
+    /* Try to read the final message 10 times */
+    uint8_t n_tries = 0;
     bool got_final = false;
+    while ((!got_final) & (n_tries < 5)) {
+        if (read_message() != 0) {
+            continue;
+        }
+        n_tries++;
 
-    while (!got_final) {
+        /* Check that the frame is a final message sent by same anchor.*/
+        if ((rx_frame_seq_nb + 1) != rx_buffer[ALL_MSG_SN_IDX]) {
+            continue;
+        }
+
+        rx_buffer[ALL_MSG_SN_IDX] = 0;
         if (memcmp(rx_buffer, rx_final_msg, ALL_MSG_COMMON_LEN) == 0) {
             got_final = true;
             break;
         }
-        if (memcmp(rx_buffer, rx_final_msg, ALL_MSG_COMMON_LEN) != 0) {
-            return;
-        }
     }
+
+    if (!got_final) {
+        return;
+    }
+
     uint32_t poll_tx_ts, resp_rx_ts, final_tx_ts;
     uint32_t poll_rx_ts_32, resp_tx_ts_32, final_rx_ts_32;
     double Ra, Rb, Da, Db;
@@ -246,67 +240,4 @@ void DW1000::rx_err_cb(const dwt_cb_data_t *cb_data) {
     /* Re-activate reception immediately. */
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
     /* TESTING BREAKPOINT LOCATION #3 */
-}
-
-/*
- * @fn get_tx_timestamp_u64()
- *
- * @brief Get the TX time-stamp in a 64-bit variable.
- *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
- *
- * @param  none
- *
- * @return  64-bit value of the read time-stamp.
- */
-static uint64_t get_tx_timestamp_u64(void) {
-    uint8_t ts_tab[5];
-    uint64_t ts = 0;
-    int i;
-    dwt_readtxtimestamp(ts_tab);
-    for (i = 4; i >= 0; i--) {
-        ts <<= 8;
-        ts |= ts_tab[i];
-    }
-    return ts;
-}
-
-/*
- * @fn get_rx_timestamp_u64()
- *
- * @brief Get the RX time-stamp in a 64-bit variable.
- *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
- *
- * @param  none
- *
- * @return  64-bit value of the read time-stamp.
- */
-static uint64_t get_rx_timestamp_u64(void) {
-    uint8_t ts_tab[5];
-    uint64_t ts = 0;
-    int i;
-    dwt_readrxtimestamp(ts_tab);
-    for (i = 4; i >= 0; i--)  {
-        ts <<= 8;
-        ts |= ts_tab[i];
-    }
-    return ts;
-}
-
-/*
- * @fn final_msg_get_ts()
- *
- * @brief Read a given timestamp value from the final message. In the timestamp fields of the final message, the least
- *        significant byte is at the lower address.
- *
- * @param  ts_field  pointer on the first byte of the timestamp field to read
- *         ts  timestamp value
- *
- * @return none
- */
-static void final_msg_get_ts(const uint8_t *ts_field, uint32_t *ts) {
-    int i;
-    *ts = 0;
-    for (i = 0; i < FINAL_MSG_TS_LEN; i++) {
-        *ts += ts_field[i] << (i * 8);
-    }
 }
