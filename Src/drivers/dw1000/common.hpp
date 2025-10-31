@@ -11,6 +11,9 @@
 
 /* Define the global dw1000 object */
 extern DW1000 dw1000;
+#define SOURCE_ID_IND           8
+#define DEST_ID_IND             6
+#define MSG_TYPE_IND 9
 
 /* Speed of light in air, in metres per second. */
 #define SPEED_OF_LIGHT 299702547

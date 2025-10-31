@@ -34,6 +34,17 @@ uint8_t DW1000::frame_seq_nb = 0;
 uint8_t DW1000::rx_buffer[RX_BUF_LEN] = {};
 
 int8_t DW1000::read_message() {
+    while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) &
+                (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {}
+
+    if (!(status_reg & SYS_STATUS_RXFCG)) {
+        /* Clear RX error/timeout events in the DW1000 status register. */
+        dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
+        /* Reset RX to properly reinitialise LDE operation. */
+        dwt_rxreset();
+        return -1;
+    }
+
     /* Clear good RX frame event in the DW1000 status register. */
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG);
 

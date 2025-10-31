@@ -11,9 +11,6 @@
 #include "../uart_logger/logger.hpp"
 #include <cstdio>
 
-/* Frames used in the ranging process. See NOTE 2 below. */
-const uint8_t RX_ANCHOR_ID_IND = 8;
-const uint8_t TX_ANCHOR_ID_IND = 6;
 
 /* Index to access some of the fields in the frames involved in the process. */
 #define FINAL_MSG_POLL_TX_TS_IDX 10
@@ -43,34 +40,12 @@ static uint64_t poll_rx_ts;  // tx|rx changed, partially transfered
 static uint64_t resp_tx_ts;
 static uint64_t final_rx_ts;
 
+/* Frames used in the ranging process. */
 static uint8_t rx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 0x00, 0x21, 0, 0};
 static uint8_t tx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 0x00, 'W', ID, 0x10, 0x02, 0, 0, 0, 0};
 static uint8_t rx_final_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', ID, 'V', 0x00, 0x23, 0,
                                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-
-/*
- * @fn rx_ok_cb()
- *
- * @brief Callback to process RX good frame events
- *
- * @param  cb_data  callback data
- *
- * @return  none
- */
-void DW1000::rx_ok_cb(const dwt_cb_data_t *cb_data) {
-    /* Perform manual RX re-enabling. See NOTE 5 below. */
-    dwt_rxenable(DWT_START_RX_IMMEDIATE | DWT_NO_SYNC_PTRS);
-
-    /* TESTING BREAKPOINT LOCATION #1 */
-
-    /* A frame has been received, copy it to our local buffer. See NOTE 6 below. */
-    if (cb_data->datalength <= FRAME_LEN_MAX) {
-        dwt_readrxdata(rx_buffer, cb_data->datalength, 0);
-    }
-
-    /* TESTING BREAKPOINT LOCATION #2 */
-}
 
 int DW1000::reset() {
     if (common_reset() != 0) return -1;
@@ -80,14 +55,14 @@ int DW1000::reset() {
     return 0;
 }
 
-void DW1000::spin() {
+int8_t DW1000::spin() {
     /* Clear reception timeout to start next ranging process. */
     dwt_setrxtimeout(0);
 
     /* Activate reception immediately. */
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
-    /* Poll for reception of a frame or error/timeout. See NOTE 8 below. */
+    /* Poll for reception of a frame or error/timeout. */
     while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) &
             (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {}
     if (!(status_reg & SYS_STATUS_RXFCG)) {
@@ -95,26 +70,36 @@ void DW1000::spin() {
         dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
         /* Reset RX to properly reinitialise LDE operation. */
         dwt_rxreset();
-        return;
+        return -1;
+    }
+    bool got_poll = false;
+    uint8_t n_tries = 0;
+    while((!got_poll) & (n_tries < 5)) {
+        if (read_message() != 0) {
+            continue;
+        }
+        n_tries++;
+
+        if (rx_buffer[MSG_TYPE_IND] != 0x21) {
+            continue;
+        }
+        got_poll = true;
     }
 
-    if (read_message() != 0) {
-        return;
+    if (!got_poll) {
+        return -1;
     }
-
-    uint8_t rx_frame_seq_nb = rx_buffer[ALL_MSG_SN_IDX];
 
     rx_buffer[ALL_MSG_SN_IDX] = 0;
 
     /* Check that the frame is a poll sent by which anchor.
         * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
-    uint8_t anchor_id = rx_buffer[RX_ANCHOR_ID_IND];
-
-    rx_poll_msg[RX_ANCHOR_ID_IND] = anchor_id;
-    tx_resp_msg[TX_ANCHOR_ID_IND] = anchor_id;
-    rx_final_msg[RX_ANCHOR_ID_IND] = anchor_id;
+    uint8_t anchor_id = rx_buffer[SOURCE_ID_IND];
+    rx_poll_msg[SOURCE_ID_IND] = anchor_id;
+    tx_resp_msg[DEST_ID_IND] = anchor_id;
+    rx_final_msg[SOURCE_ID_IND] = anchor_id;
     if (memcmp(rx_buffer, rx_poll_msg, ALL_MSG_COMMON_LEN) != 0) {
-        return;
+        return -1;
     }
     uint32_t resp_tx_time;
     int ret;
@@ -140,47 +125,31 @@ void DW1000::spin() {
     and proceed to the next one. See NOTE 11 below. */
     if (ret == DWT_ERROR) {
         logs("F\n");
-        return;
+        return -1;
     }
-
-    /* Poll for reception of expected "final" frame or error/timeout. See NOTE 8 below. */
-    while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) &
-                (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {}
 
     /* Increment frame sequence number after transmission of the response message (modulo 256). */
     frame_seq_nb++;
 
-    if (!(status_reg & SYS_STATUS_RXFCG)) {
-        /* Clear RX error/timeout events in the DW1000 status register. */
-        dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
-        /* Reset RX to properly reinitialise LDE operation. */
-        dwt_rxreset();
-        return;
-    }
-
     /* Try to read the final message 10 times */
-    uint8_t n_tries = 0;
+    n_tries = 0;
     bool got_final = false;
     while ((!got_final) & (n_tries < 5)) {
         if (read_message() != 0) {
             continue;
         }
         n_tries++;
-
-        /* Check that the frame is a final message sent by same anchor.*/
-        if ((rx_frame_seq_nb + 1) != rx_buffer[ALL_MSG_SN_IDX]) {
+        if (rx_buffer[MSG_TYPE_IND] != 0x23) {
             continue;
         }
-
-        rx_buffer[ALL_MSG_SN_IDX] = 0;
-        if (memcmp(rx_buffer, rx_final_msg, ALL_MSG_COMMON_LEN) == 0) {
-            got_final = true;
-            break;
+        if ((rx_buffer[DEST_ID_IND] != ID) || (rx_buffer[SOURCE_ID_IND] != anchor_id)) {
+            continue;
         }
+        got_final = true;
     }
 
     if (!got_final) {
-        return;
+        return -1;
     }
 
     uint32_t poll_tx_ts, resp_rx_ts, final_tx_ts;
@@ -209,7 +178,7 @@ void DW1000::spin() {
     tof = tof_dtu * DWT_TIME_UNITS;
     distance = tof * SPEED_OF_LIGHT;
     if (distance < 0) {
-        return;
+        return -1;
     }
 
     /* Display computed distance on LCD. */
@@ -224,20 +193,5 @@ void DW1000::spin() {
     log_data[7] = 0xFF;
     log_data[8] = 0;
     logc(log_data, 9);
-}
-
-/*
- * @fn rx_err_cb()
- *
- * @brief Callback to process RX error events
- *
- * @param  cb_data  callback data
- *
- * @return  none
- */
-void DW1000::rx_err_cb(const dwt_cb_data_t *cb_data) {
-    (void)cb_data;
-    /* Re-activate reception immediately. */
-    dwt_rxenable(DWT_START_RX_IMMEDIATE);
-    /* TESTING BREAKPOINT LOCATION #3 */
+    return 0;
 }

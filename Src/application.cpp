@@ -26,7 +26,9 @@ __attribute__((noreturn)) void application_entry_point() {
     while (true) {
         HAL_GPIO_TogglePin(GPIOA, LED2_Pin);
         logger.spin();
-        dw1000.spin();
+        if (dw1000.spin() != 0) {
+            continue;
+        }
         HAL_IWDG_Refresh(&hiwdg);
     }
 }

@@ -36,7 +36,7 @@ class DW1000 {
          * performance. */
         return reset();
     }
-    void spin();
+    int8_t spin();
 
  private:
     int common_reset();
