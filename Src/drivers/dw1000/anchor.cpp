@@ -23,8 +23,8 @@ static uint64_t poll_tx_ts;
 static uint64_t resp_rx_ts;
 static uint64_t final_tx_ts;
 
-const uint8_t SOURCE_ID_IND = 8;
-const uint8_t DEST_ID_IND = 6;
+#define SOURCE_ID_IND    8
+#define DEST_ID_IND      6
 
 /* Frames used in the ranging process. */
 static uint8 tx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', ID, 0x21, 0, 0};
@@ -42,10 +42,17 @@ int DW1000::reset() {
     return 0;
 }
 
-void DW1000::spin() {
+int8_t DW1000::spin() {
+    // /* Poll DW1000 until TX frame sent event set.*/
+    // while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS))
+    // { };
+
+    /* Clear TXFRS event. */
+    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
+
     static uint32_t last_transition_ms = 0;
     if (HAL_GetTick() - last_transition_ms < RNG_DELAY_MS) {
-        return;
+        return 0;
     }
 
     /* Write frame data to DW1000 and prepare transmission. See NOTE 8 below. */
@@ -63,7 +70,7 @@ void DW1000::spin() {
         (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {
         if (status_reg & SYS_STATUS_ALL_RX_ERR) {
             init();
-            return;
+            return -1;
         }
     }
 
@@ -75,6 +82,7 @@ void DW1000::spin() {
 
         /* Reset RX to properly reinitialise LDE operation. */
         dwt_rxreset();
+        return -1;
     }
 
     uint8_t n_tries = 0;
@@ -97,8 +105,9 @@ void DW1000::spin() {
         got_response = true;
     }
     if (!got_response) {
-        return;
+        return -1;
     }
+
 /* Check that the frame is the expected response from the companion "DS TWR responder" example. */
     uint32 final_tx_time;
     int ret;
@@ -127,17 +136,13 @@ void DW1000::spin() {
 
     /* If dwt_starttx() returns an error, abandon this ranging exchange and proceed
     to the next one.*/
-    if (ret == DWT_SUCCESS) {
-        /* Poll DW1000 until TX frame sent event set.*/
-        while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS))
-        { };
-
-        /* Clear TXFRS event. */
-        dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
-
-        /* Increment frame sequence number after transmission of the final message (modulo 256). */
-        frame_seq_nb++;
+    if (ret != DWT_SUCCESS) {
+        return -1;
     }
+
+    /* Increment frame sequence number after transmission of the final message (modulo 256). */
+    frame_seq_nb++;
     /* Execute a delay between ranging exchanges. */
     last_transition_ms = HAL_GetTick();
+    return 0;
 }
