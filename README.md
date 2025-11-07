@@ -92,7 +92,7 @@ docker run -it --rm \
 
 4. **Run the node:**
    ```bash
-   ros2 launch uwb_beacons uwb_beacons_ros2.launch.py
+   ros2 launch uwb_beacons uwb_beacons.launch.py
    ```
 
 ## Configuration
