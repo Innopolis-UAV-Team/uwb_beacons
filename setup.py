@@ -2,13 +2,6 @@ from setuptools import setup
 from glob import glob
 
 package_name = 'uwb_beacons'
-import setuptools
-import subprocess
-import os
-
-# Automatically install pip requirements when building via colcon
-if os.environ.get("COLCON_BUILD") or os.environ.get("AMENT_PREFIX_PATH"):
-    subprocess.check_call(['pip', 'install', '-r', 'requirements.txt'])
 
 setup(
     name=package_name,

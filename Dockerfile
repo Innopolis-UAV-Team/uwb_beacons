@@ -24,7 +24,8 @@ RUN pip3 install --no-cache-dir \
     pyserial \
     numpy \
     scipy \
-    shapely
+    shapely \
+    Localization
 
 # Install ROS2 Python packages and build tools
 RUN apt-get update && apt-get install -y \
