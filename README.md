@@ -61,7 +61,11 @@ docker run -it --rm \
 
 - ROS2 Humble installed
 - Python 3.8+
-- Required Python packages: numpy, scipy, pyserial
+- Required Python packages: numpy, pyserial, Localization
+
+> [!NOTE]
+> Localization should be installed outside the colcon build!
+
 
 ### Installation
 
@@ -76,7 +80,7 @@ docker run -it --rm \
    ```bash
    sudo apt update
    sudo apt install python3-pip python3-numpy python3-scipy python3-serial
-   pip3 install pyserial numpy scipy
+   pip3 install pyserial numpy Localization
    ```
 
 3. **Build the workspace:**

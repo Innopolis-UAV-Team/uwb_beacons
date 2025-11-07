@@ -1,4 +1,0 @@
-Localization
-numpy
-matplotlib
-shapely

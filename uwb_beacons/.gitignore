@@ -1,8 +1,0 @@
-build
-__pycache__
-venv
-.png
-test/*/data
-test/*/figs
-*.csv
-*.log

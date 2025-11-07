@@ -9,30 +9,25 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 find_package(rclpy REQUIRED)
-find_package(std_msgs REQUIRED)
-find_package(geometry_msgs REQUIRED)
-find_package(sensor_msgs REQUIRED)
 
-# Install Python modules
-ament_python_install_package(${PROJECT_NAME})
-
-# Install Python executables
-install(PROGRAMS
-  scripts/uwb_beacons_ros2.py
-  DESTINATION lib/${PROJECT_NAME}
+# Install Python package
+# Note: ament_python_install_package automatically installs entry_points
+# from setup.py to the SCRIPTS_DESTINATION
+# PACKAGE_DIR should be the directory containing setup.py (the root of the package)
+# The first argument is the Python package name, PACKAGE_DIR is where setup.py is
+ament_python_install_package(uwb_beacon_ros2
+  PACKAGE_DIR uwb_beacon_ros2
+  SCRIPTS_DESTINATION lib/${PROJECT_NAME}
 )
 
 # Install launch files
-install(DIRECTORY
-  launch
+install(DIRECTORY launch
   DESTINATION share/${PROJECT_NAME}/
 )
 
 # Install config files
-install(DIRECTORY
-  config
+install(DIRECTORY config
   DESTINATION share/${PROJECT_NAME}/
-  OPTIONAL
 )
 
 if(BUILD_TESTING)
@@ -41,3 +36,4 @@ if(BUILD_TESTING)
 endif()
 
 ament_package()
+

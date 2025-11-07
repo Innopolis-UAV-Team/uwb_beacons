@@ -44,7 +44,7 @@ Edit this file to configure:
 
 3. Launch with your settings:
    ```bash
-   ros2 launch uwb_beacons uwb_beacons_ros2.launch.py
+   ros2 launch uwb_beacons uwb_beacons.launch.py
    ```
 
 # Parameters

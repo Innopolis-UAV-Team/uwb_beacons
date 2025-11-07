@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y \
     python3-serial \
     python3-yaml \
     python3-setuptools \
+    python3-ament-package \
     build-essential \
     cmake \
     git \
@@ -23,8 +24,7 @@ RUN pip3 install --no-cache-dir \
     pyserial \
     numpy \
     scipy \
-    shapely \
-    Localization
+    shapely
 
 # Install ROS2 Python packages and build tools
 RUN apt-get update && apt-get install -y \
@@ -37,25 +37,18 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Create workspace directory
-WORKDIR /app
+WORKDIR /ros2_ws
 
-# Create directories
-RUN mkdir -p /app/config /app/launch /app/uwb_beacons
+# Create src directory for ROS2 workspace
+RUN mkdir -p /ros2_ws/src
 
-# Copy application files
-COPY scripts/uwb_beacons_ros2.py /app/uwb_beacons/
-COPY scripts/algoritms.py /app/uwb_beacons/
-COPY scripts/serial_messages.py /app/uwb_beacons/
-COPY config/uwb_beacons_params.yaml /app/config/
-COPY launch/uwb_beacons_ros2.launch.py /app/launch/
-COPY package.xml /app/
-COPY CMakeLists.txt /app/
+# Copy application files to workspace
+COPY . /ros2_ws/src/uwb_beacons/
 
-# Create __init__.py for Python package
-RUN touch /app/uwb_beacons/__init__.py
-
-# Make the script executable
-RUN chmod +x /app/uwb_beacons/uwb_beacons_ros2.py
+# Build the workspace (this will be done at build time)
+RUN /bin/bash -c "source /opt/ros/humble/setup.bash && \
+    cd /ros2_ws && \
+    colcon build --packages-select uwb_beacons"
 
 # Create entrypoint script
 RUN echo '#!/bin/bash\n\
@@ -64,14 +57,19 @@ set -e\n\
 # Source ROS2 setup\n\
 source /opt/ros/humble/setup.bash\n\
 \n\
-# Build the workspace if needed\n\
-if [ ! -f /app/install/setup.bash ]; then\n\
-    cd /app\n\
-    colcon build --packages-select uwb_beacons\n\
+# Build workspace if install directory is empty or missing\n\
+if [ ! -f /ros2_ws/install/setup.bash ]; then\n\
+    echo "Building ROS2 workspace..."\n\
+    cd /ros2_ws && colcon build --packages-select uwb_beacons\n\
 fi\n\
 \n\
 # Source the workspace\n\
-source /app/install/setup.bash\n\
+if [ -f /ros2_ws/install/setup.bash ]; then\n\
+    source /ros2_ws/install/setup.bash\n\
+else\n\
+    echo "ERROR: Workspace setup.bash not found after build attempt"\n\
+    exit 1\n\
+fi\n\
 \n\
 # Execute the command passed to the container\n\
 exec "$@"' > /entrypoint.sh && \
@@ -81,4 +79,4 @@ exec "$@"' > /entrypoint.sh && \
 ENTRYPOINT ["/entrypoint.sh"]
 
 # Default command
-CMD ["ros2", "launch", "uwb_beacons", "uwb_beacons_ros2.launch.py"]
+CMD ["ros2", "launch", "uwb_beacons", "uwb_beacons.launch.py"]

@@ -13,13 +13,17 @@ services:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       # Mount workspace for development (optional)
       - ./:/ros2_ws/src/uwb_beacons:rw
+      # Mount build directory to persist build artifacts
+      - ./build:/ros2_ws/build:rw
+      - ./install:/ros2_ws/install:rw
+      - ./log:/ros2_ws/log:rw
     devices:
       # Ensure access to serial devices
       - /dev/ttyUSB0:/dev/ttyUSB0
     network_mode: host
     privileged: true
     command: >
-      ros2 launch uwb_beacons uwb_beacons_ros2.launch.py
+      ros2 launch uwb_beacons uwb_beacons.launch.py
 
   # Optional: Add RViz for visualization
   rviz:
