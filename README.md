@@ -1,4 +1,4 @@
-# UWB Localizer ROS2
+# UWB beacons ROS2
 
 This is the ROS2 version of the UWB (Ultra-Wideband) localization system. It provides real-time positioning using UWB anchors and trilateration algorithms.
 
@@ -23,7 +23,7 @@ This is the ROS2 version of the UWB (Ultra-Wideband) localization system. It pro
 
 1. **Basic usage:**
    ```bash
-   docker-compose up uwb-localizer
+   docker-compose up uwb-beacons
    ```
 
 2. **With RViz visualization:**
@@ -39,20 +39,20 @@ This is the ROS2 version of the UWB (Ultra-Wideband) localization system. It pro
 4. **Build and run:**
    ```bash
    docker-compose build
-   docker-compose up uwb-localizer
+   docker-compose up uwb-beacons
    ```
 
 ### Manual Docker Build
 
 ```bash
 # Build the image
-docker build -t uwb-localizer-ros2 .
+docker build -t uwb-beacons-ros2 .
 
 # Run the container
 docker run -it --rm \
   --device=/dev/ttyUSB0 \
   --network=host \
-  uwb-localizer-ros2
+  uwb-beacons-ros2
 ```
 
 ## Manual ROS2 Installation
@@ -69,7 +69,7 @@ docker run -it --rm \
    ```bash
    mkdir -p ~/ros2_ws/src
    cd ~/ros2_ws/src
-   # Copy the uwb_localizer package here
+   # Copy the uwb_beacons package here
    ```
 
 2. **Install dependencies:**
@@ -88,7 +88,7 @@ docker run -it --rm \
 
 4. **Run the node:**
    ```bash
-   ros2 launch uwb_localizer uwb_localizer_ros2.launch.py
+   ros2 launch uwb_beacons uwb_beacons_ros2.launch.py
    ```
 
 ## Configuration
@@ -195,9 +195,9 @@ ros2 topic echo /uwb/debug
 ```
 RTK-DW-main/
 ├── scripts/
-│   └── uwb_localizer_ros2.py    # Main ROS2 node
+│   └── uwb_beacons_ros2.py    # Main ROS2 node
 ├── launch/
-│   └── uwb_localizer_ros2.launch.py  # Launch file
+│   └── uwb_beacons_ros2.launch.py  # Launch file
 ├── package.xml                   # ROS2 package definition
 ├── CMakeLists.txt               # Build configuration
 ├── Dockerfile                   # Docker image definition
@@ -210,10 +210,10 @@ RTK-DW-main/
 
 ### Adding New Features
 
-1. Modify the Python node in `scripts/uwb_localizer_ros2.py`
+1. Modify the Python node in `scripts/uwb_beacons_ros2.py`
 2. Update launch parameters if needed
 3. Rebuild the Docker image: `docker-compose build`
-4. Test with: `docker-compose up uwb-localizer`
+4. Test with: `docker-compose up uwb-beacons`
 
 ## License
 
