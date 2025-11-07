@@ -4,11 +4,11 @@ This directory contains configuration files for the UWB Localizer ROS2 package.
 
 ## Files
 
-### `uwb_localizer_params_example.yaml`
+### `uwb_beacons_params_example.yaml`
 **Template configuration file** - Copy this to create your own configuration.
 
 ```bash
-cp uwb_localizer_params_example.yaml uwb_localizer_params.yaml
+cp uwb_beacons_params_example.yaml uwb_beacons_params.yaml
 ```
 
 This file includes:
@@ -17,7 +17,7 @@ This file includes:
 - Calibration parameter explanations
 - Setup tips and best practices
 
-### `uwb_localizer_params.yaml` (ignored by git)
+### `uwb_beacons_params.yaml` (ignored by git)
 **Your personal configuration** - This file is ignored by git to prevent accidental commits of personal settings.
 
 Edit this file to configure:
@@ -34,17 +34,17 @@ Edit this file to configure:
 
 1. Copy the example file:
    ```bash
-   cp uwb_localizer_params_example.yaml uwb_localizer_params.yaml
+   cp uwb_beacons_params_example.yaml uwb_beacons_params.yaml
    ```
 
 2. Edit your configuration:
    ```bash
-   nano uwb_localizer_params.yaml
+   nano uwb_beacons_params.yaml
    ```
 
 3. Launch with your settings:
    ```bash
-   ros2 launch uwb_localizer uwb_localizer_ros2.launch.py
+   ros2 launch uwb_beacons uwb_beacons_ros2.launch.py
    ```
 
 # Parameters
@@ -83,4 +83,4 @@ Edit this file to configure:
 - **Anchor positions** must be measured accurately in meters
 - **Calibration parameters** need to be determined for your specific UWB system
 - **At least 3 anchors** are required for trilateration
-- The `uwb_localizer_params.yaml` file is ignored by git to keep your personal settings private
+- The `uwb_beacons_params.yaml` file is ignored by git to keep your personal settings private

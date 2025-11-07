@@ -57,21 +57,21 @@ def generate_launch_description():
     )
 
     # Get the package directory
-    pkg_share = FindPackageShare('uwb_localizer')
+    pkg_share = FindPackageShare('uwb_beacons')
 
     # Default config file path
     default_config_file = PathJoinSubstitution([
-        pkg_share, 'config', 'uwb_localizer_params.yaml'
+        pkg_share, 'config', 'uwb_beacons_params.yaml'
     ])
 
     # Use provided config file or default
     config_file = LaunchConfiguration('config_file')
 
     # UWB Localizer node
-    uwb_localizer_node = Node(
-        package='uwb_localizer',
-        executable='uwb_localizer_ros2.py',
-        name='uwb_localizer',
+    uwb_beacons_node = Node(
+        package='uwb_beacons',
+        executable='uwb_beacons_ros2.py',
+        name='uwb_beacons',
         output='screen',
         parameters=[
             default_config_file,
@@ -91,5 +91,5 @@ def generate_launch_description():
         z_sign_arg,
         config_file_arg,
         use_sim_time_arg,
-        uwb_localizer_node,
+        uwb_beacons_node,
     ])

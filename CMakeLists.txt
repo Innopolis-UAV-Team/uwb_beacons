@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(uwb_localizer)
+project(uwb_beacons)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -18,7 +18,7 @@ ament_python_install_package(${PROJECT_NAME})
 
 # Install Python executables
 install(PROGRAMS
-  uwb_localizer/uwb_localizer_ros2.py
+  scripts/uwb_beacons_ros2.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

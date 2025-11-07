@@ -40,22 +40,22 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Create directories
-RUN mkdir -p /app/config /app/launch /app/uwb_localizer
+RUN mkdir -p /app/config /app/launch /app/uwb_beacons
 
 # Copy application files
-COPY scripts/uwb_localizer_ros2.py /app/uwb_localizer/
-COPY scripts/algoritms.py /app/uwb_localizer/
-COPY scripts/serial_messages.py /app/uwb_localizer/
-COPY config/uwb_localizer_params.yaml /app/config/
-COPY launch/uwb_localizer_ros2.launch.py /app/launch/
+COPY scripts/uwb_beacons_ros2.py /app/uwb_beacons/
+COPY scripts/algoritms.py /app/uwb_beacons/
+COPY scripts/serial_messages.py /app/uwb_beacons/
+COPY config/uwb_beacons_params.yaml /app/config/
+COPY launch/uwb_beacons_ros2.launch.py /app/launch/
 COPY package.xml /app/
 COPY CMakeLists.txt /app/
 
 # Create __init__.py for Python package
-RUN touch /app/uwb_localizer/__init__.py
+RUN touch /app/uwb_beacons/__init__.py
 
 # Make the script executable
-RUN chmod +x /app/uwb_localizer/uwb_localizer_ros2.py
+RUN chmod +x /app/uwb_beacons/uwb_beacons_ros2.py
 
 # Create entrypoint script
 RUN echo '#!/bin/bash\n\
@@ -67,7 +67,7 @@ source /opt/ros/humble/setup.bash\n\
 # Build the workspace if needed\n\
 if [ ! -f /app/install/setup.bash ]; then\n\
     cd /app\n\
-    colcon build --packages-select uwb_localizer\n\
+    colcon build --packages-select uwb_beacons\n\
 fi\n\
 \n\
 # Source the workspace\n\
@@ -81,4 +81,4 @@ exec "$@"' > /entrypoint.sh && \
 ENTRYPOINT ["/entrypoint.sh"]
 
 # Default command
-CMD ["ros2", "launch", "uwb_localizer", "uwb_localizer_ros2.launch.py"]
+CMD ["ros2", "launch", "uwb_beacons", "uwb_beacons_ros2.launch.py"]

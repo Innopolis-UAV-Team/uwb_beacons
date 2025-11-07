@@ -12,8 +12,8 @@ from scipy.optimize import least_squares
 import sys, os
 # sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from uwb_localizer.algoritms import multilateration
-from uwb_localizer.serial_messages import CircularBuffer, Message
+from uwb_beacons.algoritms import multilateration
+from uwb_beacons.serial_messages import CircularBuffer, Message
 
 def calibrated_linear(raw, a, b):
     return a * raw + b
@@ -26,7 +26,7 @@ def calibrated_cubic(raw, a, b, c, d):
 
 class UWBLocalizer(Node):
     def __init__(self):
-        super().__init__('uwb_localizer')
+        super().__init__('uwb_beacons')
         
         # Declare parameters (will be loaded from config file)
         self.declare_parameter('port')

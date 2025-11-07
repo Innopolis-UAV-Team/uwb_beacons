@@ -82,7 +82,7 @@ docker run -it --rm \
 3. **Build the workspace:**
    ```bash
    cd ~/ros2_ws
-   colcon build --packages-select uwb_localizer
+   colcon build --packages-select uwb_beacon
    source install/setup.bash
    ```
 

@@ -1,7 +1,7 @@
 services:
-  uwb-localizer:
+  uwb-beacons:
     build: .
-    container_name: uwb_localizer_ros2
+    container_name: uwb_beacons_ros2
     restart: unless-stopped
     environment:
       - ROS_DOMAIN_ID=0
@@ -12,14 +12,14 @@ services:
       # Mount X11 socket for GUI applications (if needed)
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       # Mount workspace for development (optional)
-      - ./:/ros2_ws/src/uwb_localizer:rw
+      - ./:/ros2_ws/src/uwb_beacons:rw
     devices:
       # Ensure access to serial devices
       - /dev/ttyUSB0:/dev/ttyUSB0
     network_mode: host
     privileged: true
     command: >
-      ros2 launch uwb_localizer uwb_localizer_ros2.launch.py
+      ros2 launch uwb_beacons uwb_beacons_ros2.launch.py
 
   # Optional: Add RViz for visualization
   rviz:
@@ -33,7 +33,7 @@ services:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
     network_mode: host
     depends_on:
-      - uwb-localizer
+      - uwb-beacons
     command: rviz2
     profiles:
       - gui  # Only start with --profile gui
@@ -49,7 +49,7 @@ services:
       - ./data:/data:rw
     network_mode: host
     depends_on:
-      - uwb-localizer
+      - uwb-beacons
     command: >
       bash -c "
       mkdir -p /data/uwb_logs &&

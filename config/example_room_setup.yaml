@@ -1,7 +1,7 @@
 # Example configuration for a room setup with 4 anchors
-# This file shows how to configure the UWB localizer for a specific room layout
+# This file shows how to configure the UWB beacons for a specific room layout
 
-uwb_localizer:
+uwb_beacons:
   ros__parameters:
     # Serial communication parameters
     port: "/dev/ttyUSB0"

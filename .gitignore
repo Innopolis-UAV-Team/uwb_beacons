@@ -8,4 +8,4 @@ test/*/figs
 *.log
 
 # Configuration files - users should copy the example and customize
-config/uwb_localizer_params.yaml
+config/uwb_beacons_params.yaml

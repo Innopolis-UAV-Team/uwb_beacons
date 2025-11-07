@@ -1,8 +1,8 @@
 # Example UWB Localizer Configuration File
-# Copy this file to uwb_localizer_params.yaml and modify as needed
+# Copy this file to uwb_beacons_params.yaml and modify as needed
 # This file is ignored by git to prevent accidental commits of personal configurations
 
-uwb_localizer:
+uwb_beacons:
   ros__parameters:
     # Serial communication parameters
     port: "/dev/ttyUSB0"  # Change to your UWB device port

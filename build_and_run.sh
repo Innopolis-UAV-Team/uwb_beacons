@@ -37,7 +37,7 @@ show_usage() {
     echo ""
     echo "Options:"
     echo "  build     Build the Docker image"
-    echo "  run       Run the UWB localizer"
+    echo "  run       Run the UWB beacons"
     echo "  gui       Run with RViz visualization"
     echo "  record    Run with data recording"
     echo "  stop      Stop all running containers"
@@ -47,7 +47,7 @@ show_usage() {
     echo ""
     echo "Examples:"
     echo "  $0 build                    # Build the image"
-    echo "  $0 run                      # Run basic UWB localizer"
+    echo "  $0 run                      # Run basic UWB beacons"
     echo "  $0 gui                      # Run with RViz"
     echo "  $0 record                   # Run with data recording"
 }
@@ -56,12 +56,12 @@ show_usage() {
 case "${1:-run}" in
     "build")
         echo "Building UWB Localizer ROS2 Docker image..."
-        docker-compose build uwb-localizer
+        docker-compose build uwb-beacons
         echo "Build completed successfully!"
         ;;
     "run")
         echo "Starting UWB Localizer ROS2..."
-        docker-compose up uwb-localizer
+        docker-compose up uwb-beacons
         ;;
     "gui")
         echo "Starting UWB Localizer ROS2 with RViz..."
