@@ -12,6 +12,46 @@ This is the ROS2 version of the UWB (Ultra-Wideband) localization system. It pro
 - Configurable anchor positions
 - Simplified deployment (no complex ROS2 workspace building required)
 
+## Manual ROS2 Installation
+
+### Prerequisites
+
+- ROS2 Humble installed
+- Python 3.8+
+- Required Python packages: numpy, pyserial, Localization
+
+> [!NOTE]
+> Localization should be installed outside the colcon build!
+
+
+### Installation
+
+1. **Clone and setup workspace:**
+   ```bash
+   mkdir -p ~/ros2_ws/src
+   cd ~/ros2_ws/src
+   # Copy the uwb_beacons package here
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   sudo apt update
+   sudo apt install python3-pip python3-numpy python3-scipy python3-serial
+   pip3 install pyserial numpy Localization
+   ```
+
+3. **Build the workspace:**
+   ```bash
+   cd ~/ros2_ws
+   colcon build --packages-select uwb_beacons
+   source install/setup.bash
+   ```
+
+4. **Run the node:**
+   ```bash
+   ros2 launch uwb_beacons uwb_beacons.launch.py
+   ```
+
 ## Quick Start with Docker
 
 ### Prerequisites
@@ -54,46 +94,6 @@ docker run -it --rm \
   --network=host \
   uwb-beacons-ros2
 ```
-
-## Manual ROS2 Installation
-
-### Prerequisites
-
-- ROS2 Humble installed
-- Python 3.8+
-- Required Python packages: numpy, pyserial, Localization
-
-> [!NOTE]
-> Localization should be installed outside the colcon build!
-
-
-### Installation
-
-1. **Clone and setup workspace:**
-   ```bash
-   mkdir -p ~/ros2_ws/src
-   cd ~/ros2_ws/src
-   # Copy the uwb_beacons package here
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   sudo apt update
-   sudo apt install python3-pip python3-numpy python3-scipy python3-serial
-   pip3 install pyserial numpy Localization
-   ```
-
-3. **Build the workspace:**
-   ```bash
-   cd ~/ros2_ws
-   colcon build --packages-select uwb_beacon
-   source install/setup.bash
-   ```
-
-4. **Run the node:**
-   ```bash
-   ros2 launch uwb_beacons uwb_beacons.launch.py
-   ```
 
 ## Configuration
 
