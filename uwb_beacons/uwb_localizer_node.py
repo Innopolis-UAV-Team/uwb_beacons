@@ -198,8 +198,7 @@ class UWBLocalizer(Node):
                 response = self.ser.read_until(b'\xFF\xFF\xFF\x00')
                 self.buffer.append(response)
                 if self.buffer.size == 0:
-                    return
-                if self.buffer.size < 20:
+                    self.debug_pub.publish(String(data='No data received'))
                     return
                 for i in range(self.buffer.size):
                     msg = self.buffer.pop()
@@ -235,6 +234,7 @@ class UWBLocalizer(Node):
                 pose = PoseStamped()
                 pose.header.stamp = self.get_clock().now().to_msg()
                 pose.header.frame_id = self.frame_id
+                pose.pose.position.w = 1.0
                 pose.pose.position.x = pos[0]
                 pose.pose.position.y = pos[1]
                 pose.pose.position.z = pos[2] * self.z_sign
