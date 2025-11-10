@@ -13,7 +13,7 @@ from rcl_interfaces.msg import ParameterDescriptor, ParameterType
 
 from uwb_beacons.algoritms import multilateration
 from uwb_beacons.serial_messages import CircularBuffer, Message
-from uwb_beacons.constants import DEFAULT_PARAMS
+from uwb_beacons.parameters import DEFAULT_PARAMS
 
 def calibrated_linear(raw, a, b):
     return a * raw + b
