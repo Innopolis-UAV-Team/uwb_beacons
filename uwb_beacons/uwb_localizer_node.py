@@ -129,12 +129,12 @@ class UWBLocalizer(Node):
         elif self.calib_type == 'cubic' and len(self.calib_params) != 4:
             self.get_logger().warn('Cubic calibration requires 4 parameters. Using defaults.')
             self.calib_params = [0.0, 0.0, 1.0, 0.0]
-        
+
         # Validate anchor positions
         if len(self.anchor_positions) < 3:
             self.get_logger().error('At least 3 anchor positions are required for trilateration')
             raise ValueError('Insufficient anchor positions')
-        
+
         # Validate range parameters
         if self.min_range >= self.max_range:
             self.get_logger().warn('min_range should be less than max_range. Adjusting.')
@@ -248,7 +248,7 @@ class UWBLocalizer(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    
+
     try:
         node = UWBLocalizer()
         rclpy.spin(node)
