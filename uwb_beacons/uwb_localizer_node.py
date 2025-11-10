@@ -70,20 +70,23 @@ class UWBLocalizer(Node):
         # Validate parameters
         self._validate_parameters()
         
-        self.get_logger().info(f'Anchor positions: {self.anchor_positions}')
-        self.get_logger().info(f'Calibration type: {self.calib_type}, params: {self.calib_params}')
-
-        try:
-            self.ser = serial.Serial(port, baud, timeout=timeout)
-            self.get_logger().info(f'Connected to UWB device on {port} at {baud} baud')
-        except Exception as e:
-            self.get_logger().error(f'Failed to connect to UWB device: {e}')
-            raise
-
         # Create publishers
         self.pose_pub = self.create_publisher(PoseStamped, 'uwb/pose', 10)
         self.range_pub = self.create_publisher(Range, 'uwb/ranges', 10)
         self.debug_pub = self.create_publisher(String, 'uwb/debug', 10)
+
+        self.get_logger().info(f'Anchor positions: {self.anchor_positions}')
+        self.get_logger().info(f'Calibration type: {self.calib_type}, params: {self.calib_params}')
+        self.debug_pub.publish(String(f"Anchor positions: {self.anchor_positions}"))
+        self.debug_pub.publish(String(f"Calibration type: {self.calib_type}, params: {self.calib_params}"))
+        self.debug_pub.publish(String(data='No data received'))
+
+        try:
+            self.ser = serial.Serial(port, baud, timeout=timeout)
+            self.debug_pub.publish(String(data=f'Connected to UWB device on {port} at {baud} baud'))
+        except Exception as e:
+            self.debug_pub.publish(String(data=f'Failed to connect to UWB device: {e}'))
+            raise
 
         # Create timer for main loop
         timer_period = 1.0 / timer_frequency
@@ -198,7 +201,6 @@ class UWBLocalizer(Node):
                 response = self.ser.read_until(b'\xFF\xFF\xFF\x00')
                 self.buffer.append(response)
                 if self.buffer.size == 0:
-                    self.debug_pub.publish(String(data='No data received'))
                     return
                 for i in range(self.buffer.size):
                     msg = self.buffer.pop()
