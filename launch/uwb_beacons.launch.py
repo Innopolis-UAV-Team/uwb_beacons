@@ -15,17 +15,17 @@ def generate_launch_description():
     # Get package directory
     pkg_dir = get_package_share_directory('uwb_beacons')
     config_file = os.path.join(pkg_dir, 'config', 'uwb_beacons_params.yaml')
-
+    print(f'Config file: {config_file}')
     # Precision lander node
-    precision_lander_node = Node(
+    uwb_localizer_node = Node(
         package='uwb_beacons',
         executable='uwb_localizer_node',
-        name='precision_lander_node',
+        name='uwb_localizer_node',
         parameters=[config_file],
         output='screen',
         emulate_tty=True
     )
 
     return LaunchDescription([
-        precision_lander_node
+        uwb_localizer_node
     ])

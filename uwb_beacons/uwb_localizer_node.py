@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from typing import Iterable
 import rclpy
 from rclpy.node import Node
 import serial
@@ -8,12 +9,11 @@ from geometry_msgs.msg import PoseStamped
 from sensor_msgs.msg import Range
 from std_msgs.msg import String
 from scipy.optimize import least_squares
-
-import sys, os
-# sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+from rcl_interfaces.msg import ParameterDescriptor, ParameterType
 
 from uwb_beacons.algoritms import multilateration
 from uwb_beacons.serial_messages import CircularBuffer, Message
+from uwb_beacons.constants import DEFAULT_PARAMS
 
 def calibrated_linear(raw, a, b):
     return a * raw + b
@@ -27,34 +27,22 @@ def calibrated_cubic(raw, a, b, c, d):
 class UWBLocalizer(Node):
     def __init__(self):
         super().__init__('uwb_beacons')
-        
-        # Declare parameters (will be loaded from config file)
-        self.declare_parameter('port')
-        self.declare_parameter('baud')
-        self.declare_parameter('frame_id')
-        self.declare_parameter('calibration')
-        self.declare_parameter('calib_params')
-        self.declare_parameter('z_sign')
-        self.declare_parameter('timer_frequency')
-        self.declare_parameter('min_range')
-        self.declare_parameter('max_range')
-        self.declare_parameter('field_of_view')
-        self.declare_parameter('radiation_type')
-        self.declare_parameter('timeout')
-        self.declare_parameter('publication_frequency')
+        self.__declare_parameters()
+        self.get_logger().info(f'Declared parameters: {self.parameters}')
+        self.declare_parameters(namespace='', parameters=self.parameters)
 
+        self.get_logger().info(f'Loaded parameters')
         # Get parameter values
         port = self.get_parameter('port').get_parameter_value().string_value
         baud = self.get_parameter('baud').get_parameter_value().integer_value
         self.frame_id = self.get_parameter('frame_id').get_parameter_value().string_value
+        self.anchor_positions = {}
+        for anchor_name in self.get_parameter('anchors_names').get_parameter_value().string_array_value:
+            self.anchor_positions[anchor_name] = self.get_parameter(anchor_name).get_parameter_value().double_array_value
+        if len(self.anchor_positions) < 3:
+            self.get_logger().error('At least 3 anchor positions are required for trilateration')
+            raise ValueError('Insufficient anchor positions')
 
-        # Set default anchor positions (will be overridden by config file if provided)
-        self.anchor_positions = {
-            "1": [0.0, 0.0, 0.0],
-            "2": [3.0, 0.0, 0.0],
-            "3": [0.0, 3.0, 0.0],
-            "4": [3.0, 3.0, 2.0],
-        }
         self.calib_type = self.get_parameter('calibration').get_parameter_value().string_value
         self.calib_params = self.get_parameter('calib_params').get_parameter_value().double_array_value
         self.z_sign = self.get_parameter('z_sign').get_parameter_value().integer_value
@@ -62,11 +50,10 @@ class UWBLocalizer(Node):
         self.min_range = self.get_parameter('min_range').get_parameter_value().double_value
         self.max_range = self.get_parameter('max_range').get_parameter_value().double_value
         self.field_of_view = self.get_parameter('field_of_view').get_parameter_value().double_value
-        self.radiation_type = self.get_parameter('radiation_type').get_parameter_value().integer_value
         timeout = self.get_parameter('timeout').get_parameter_value().double_value
         self.publication_period = 1 / self.get_parameter('publication_frequency').get_parameter_value().double_value
         # Anchor positions are already set above
-        
+
         # Validate parameters
         self._validate_parameters()
         
@@ -77,8 +64,8 @@ class UWBLocalizer(Node):
 
         self.get_logger().info(f'Anchor positions: {self.anchor_positions}')
         self.get_logger().info(f'Calibration type: {self.calib_type}, params: {self.calib_params}')
-        self.debug_pub.publish(String(f"Anchor positions: {self.anchor_positions}"))
-        self.debug_pub.publish(String(f"Calibration type: {self.calib_type}, params: {self.calib_params}"))
+        self.debug_pub.publish(String(data=f"Anchor positions: {self.anchor_positions}"))
+        self.debug_pub.publish(String(data=f"Calibration type: {self.calib_type}, params: {self.calib_params}"))
         self.debug_pub.publish(String(data='No data received'))
 
         try:
@@ -99,17 +86,37 @@ class UWBLocalizer(Node):
         self.last_publication_time = 0.0
         self.buffer = CircularBuffer(100)
 
-    def _parse_anchor_positions_from_array(self, anchor_array):
-        """Parse anchor positions from string array format to dictionary"""
-        anchor_dict = {}
-        # This method would handle string array format if needed
-        # For now, return default since we're using dict format
-        return {
-            "1": [0.0, 0.0, 0.0],
-            "2": [3.0, 0.0, 0.0],
-            "3": [0.0, 3.0, 0.0],
-            "4": [3.0, 3.0, 2.0],
-        }
+    def __parse_parameter(self, param_name, default_value):
+        descriptor = None
+        if   isinstance(default_value, dict):
+            for key, value in default_value.items():
+                self.__parse_parameter(f"{param_name}.{key}", value)
+        if   isinstance(default_value, Iterable):
+            if isinstance(default_value[0], str):
+                descriptor = ParameterDescriptor(description=f"Parameter {param_name}",
+                                                    type=ParameterType.PARAMETER_STRING_ARRAY)
+            elif isinstance(default_value[0], int):
+                descriptor = ParameterDescriptor(description=f"Parameter {param_name}",
+                                                    type=ParameterType.PARAMETER_INTEGER_ARRAY)
+            else:
+                descriptor = ParameterDescriptor(description=f"Parameter {param_name}",
+                                                    type=ParameterType.PARAMETER_DOUBLE_ARRAY)
+        elif isinstance(default_value, str):
+            descriptor = ParameterDescriptor(description=f"Parameter {param_name}",
+                                                type=ParameterType.PARAMETER_STRING)
+        elif isinstance(default_value, int):
+            descriptor = ParameterDescriptor(description=f"Parameter {param_name}",
+                                                type=ParameterType.PARAMETER_INTEGER)
+        else:
+            descriptor = ParameterDescriptor(description=f"Parameter {param_name}",
+                                                type=ParameterType.PARAMETER_DOUBLE)
+        self.parameters.append((param_name, default_value, descriptor))
+
+    def __declare_parameters(self):
+        """Declare parameters"""
+        self.parameters = []
+        for param_name, default_value in DEFAULT_PARAMS.items():
+            self.__parse_parameter(param_name, default_value)
 
     def _validate_parameters(self):
         """Validate parameter values"""
@@ -182,7 +189,6 @@ class UWBLocalizer(Node):
             msg = Range()
             msg.header.stamp = self.get_clock().now().to_msg()
             msg.header.frame_id = f"anchor_{anchor_id}"
-            msg.radiation_type = self.radiation_type
             msg.field_of_view = self.field_of_view
             msg.min_range = self.min_range
             msg.max_range = self.max_range

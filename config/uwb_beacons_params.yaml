@@ -1,14 +1,14 @@
-uwb_beacons:
+uwb_localizer_node:
   ros__parameters:
     # Serial communication parameters
-    port: "/dev/ttyUSB0"
+    port: "/dev/ttyUSB1"
     baud: 460800
     timeout: 1.0
 
     publication_frequency: 10.0 # Hz
 
     # Frame and coordinate system
-    frame_id: "uwb_beacons"
+    frame_id: "uwb_localizer"
     z_sign: 1
 
     # Timer frequency (Hz)
@@ -25,8 +25,8 @@ uwb_beacons:
     calib_params: [1.0, 0.0]  # [a, b] for linear, [a, b, c] for quadratic, [a, b, c, d] for cubic
 
     # Anchor positions (x, y, z in meters)
-    anchors:
-      "1": [0.0, 0.0, 0.0]
-      "2": [3.0, 0.0, 0.0]
-      "3": [0.0, 3.0, 0.0]
-      "4": [3.0, 3.0, 2.0]
+    anchors_names: ["anchor.1", "anchor.2", "anchor.3", "anchor.4"]
+    anchor.1: [0.0, 0.0, 0.0]
+    anchor.2: [3.0, 0.0, 0.0]
+    anchor.3: [0.0, 3.0, 0.0]
+    anchor.4: [3.0, 3.0, 0.0]

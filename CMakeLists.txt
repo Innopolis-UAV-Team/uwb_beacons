@@ -22,12 +22,12 @@ ament_python_install_package(uwb_beacon_ros2
 
 # Install launch files
 install(DIRECTORY launch
-  DESTINATION share/${PROJECT_NAME}/
+  DESTINATION share/${PROJECT_NAME}
 )
 
 # Install config files
 install(DIRECTORY config
-  DESTINATION share/${PROJECT_NAME}/
+  DESTINATION share/${PROJECT_NAME}
 )
 
 if(BUILD_TESTING)
