@@ -192,8 +192,12 @@ class UWBLocalizer(Node):
         return self.get_clock().now().to_msg().sec
 
     def publish_ranges(self):
+        if self.ranges is None:
+            self.get_logger().warn("No ranges received")
+            return
         for anchor_id, dist in self.ranges.items():
             if dist is None:
+                self.get_logger().info(f"Anchor {anchor_id} is silent")
                 continue
             msg = Range()
             msg.header.stamp = self.get_clock().now().to_msg()
