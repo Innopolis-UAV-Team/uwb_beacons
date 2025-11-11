@@ -28,9 +28,8 @@ class UWBLocalizer(Node):
     def __init__(self):
         super().__init__('uwb_beacons')
         self.__declare_parameters()
-        self.get_logger().info(f'Declared parameters: {self.parameters}')
         self.declare_parameters(namespace='', parameters=self.parameters)
-
+        self.__list_params()
         self.get_logger().info(f'Loaded parameters')
         # Get parameter values
         port = self.get_parameter('port').get_parameter_value().string_value
@@ -154,6 +153,11 @@ class UWBLocalizer(Node):
             self.get_logger().warn('publication_frequency should be greater than 0. Adjusting.')
             self.publication_period = 0.1
 
+    def __list_params(self):
+        """List all parameters"""
+        for param_name, default_value, descriptor in self.parameters:
+            value = self.get_parameter(param_name).get_parameter_value()
+            print(f'{descriptor}\n\t{param_name}: {value}\n')
 
     def parse_message(self, data: bytearray) -> tuple[int, float]|tuple[None, None]:
         if len(data) < 5:
