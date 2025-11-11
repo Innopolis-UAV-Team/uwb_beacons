@@ -255,6 +255,7 @@ class UWBLocalizer(Node):
             # Calculate and publish position
             pos = self.multilaterate(self.ranges)
             if pos is not None:
+                self.debug_pub.publish(String(data="Sending Pose"))
                 pose = PoseStamped()
                 pose.header.stamp = self.get_clock().now().to_msg()
                 pose.header.frame_id = self.frame_id
