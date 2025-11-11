@@ -107,22 +107,31 @@ docker run -it --rm \
 
 ### Anchor Configuration
 
-Edit the anchor positions in the launch file:
+
+Add parameters for each connected anchor in the config file and uwb_beacons/parameters.py. The value will be loaded from yaml, parameters.py is used for parameters declaration (so you can add a parameter to parameters.py once and change its value in yaml config):
+
+```yaml
+   # Anchor positions (x, y, z in meters)
+   anchors_names: ["anchor.5", "anchor.6", "anchor.7"]
+   anchor.5: [0.0, 0.0, 0.0]
+   anchor.6: [3.0, 0.0, 0.0]
+   anchor.7: [0.0, 3.0, 0.0]
+```
 
 ```python
-'anchors': {
-    "1": [0.0, 0.0, 0.0],    # Anchor 1 position (x, y, z)
-    "3": [3.0, 0.0, 0.0],    # Anchor 3 position
-    "7": [0.0, 3.0, 0.0],    # Anchor 7 position
-}
+   "anchor.5": [0.0, 0.0, 0.0],
+   "anchor.6": [3.0, 0.0, 0.0],
+   "anchor.7": [0.0, 3.0, 0.0],
+   "anchor.4": [3.0, 3.0, 0.0],
+   "anchors_names": ["anchor.5", "anchor.6", "anchor.7", "anchor.4"]
 ```
 
 ### Calibration Parameters
 
 Adjust calibration parameters in the launch file:
 
-```python
-'calib_params': [0.001, 0.0]  # [a, b] for linear: distance = a * raw + b
+```yaml
+calib_params: [0.001, 0.0]  # [a, b] for linear: distance = a * raw + b
 ```
 
 ## Topics
