@@ -52,7 +52,9 @@ class UWBLocalizer(Node):
         self.max_range = self.get_parameter('max_range').get_parameter_value().double_value
         self.field_of_view = self.get_parameter('field_of_view').get_parameter_value().double_value
         timeout = self.get_parameter('timeout').get_parameter_value().double_value
-        self.publication_period = 1 / self.get_parameter('publication_frequency').get_parameter_value().double_value
+        self.publication_period = (1 / self.get_parameter('publication_frequency').
+                                                    get_parameter_value().double_value) # seconds
+        self.publication_period = self.publication_period * 1e9 # nanoseconds
         # Anchor positions are already set above
 
         # Validate parameters
@@ -153,7 +155,7 @@ class UWBLocalizer(Node):
         # Validate publication frequency
         if self.publication_period <= 0:
             self.get_logger().warn('publication_frequency should be greater than 0. Adjusting.')
-            self.publication_period = 0.1
+            self.publication_period = 1e8 # 10 Hz
 
     def __list_params(self):
         """List all parameters"""
@@ -189,7 +191,7 @@ class UWBLocalizer(Node):
             return None
 
     def get_current_time(self):
-        return self.get_clock().now().to_msg().sec
+        return self.get_clock().now().nanoseconds
 
     def publish_ranges(self):
         if self.ranges is None:
@@ -245,10 +247,10 @@ class UWBLocalizer(Node):
                     debug_msg.data = f'Anchor {anchor_id}: raw {raw_val:.3f} m, calibrated {dist:.3f} m'
                     self.debug_pub.publish(debug_msg)
                     # self.get_logger().info(f'Range {dist} from anchor {anchor_id}')
-            if self.get_clock().now().nanoseconds - self.last_publication_time < self.publication_period * 1e9:
+            if self.get_current_time() - self.last_publication_time < self.publication_period:
                 return
             self.publish_ranges()
-            self.last_publication_time = self.get_clock().now().nanoseconds
+            self.last_publication_time = self.get_current_time()
             self.debug_pub.publish(String(data="Sending Range"))
             # Calculate and publish position
             pos = self.multilaterate(self.ranges)
