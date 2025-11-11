@@ -197,6 +197,7 @@ class UWBLocalizer(Node):
         if self.ranges is None:
             self.get_logger().warn("No ranges received")
             return
+        self.get_logger().info("Sending ranges")
         for anchor_id, dist in self.ranges.items():
             if dist is None:
                 self.get_logger().info(f"Anchor {anchor_id} is silent")
@@ -251,7 +252,6 @@ class UWBLocalizer(Node):
                 return
             self.publish_ranges()
             self.last_publication_time = self.get_current_time()
-            self.debug_pub.publish(String(data="Sending Range"))
             # Calculate and publish position
             pos = self.multilaterate(self.ranges)
             if pos is not None:
