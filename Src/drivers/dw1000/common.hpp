@@ -30,7 +30,7 @@ extern DW1000 dw1000;
 #define FINAL_MSG_RESP_RX_TS_IDX 14
 #define FINAL_MSG_FINAL_TX_TS_IDX 18
 #define FINAL_MSG_TS_LEN 4
-#define RNG_DELAY_MS 10
+#define RNG_DELAY_MS 100
 
 /* Default communication configuration. We use here EVK1000's default mode (mode 3). */
 extern dwt_config_t dw_config;
