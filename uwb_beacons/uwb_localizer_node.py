@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import traceback
 from typing import Iterable
 import rclpy
 from rclpy.node import Node
@@ -37,11 +38,12 @@ class UWBLocalizer(Node):
         self.frame_id = self.get_parameter('frame_id').get_parameter_value().string_value
         self.anchor_positions = {}
         for anchor_name in self.get_parameter('anchors_names').get_parameter_value().string_array_value:
-            self.anchor_positions[anchor_name] = self.get_parameter(anchor_name).get_parameter_value().double_array_value
+            anchor_id = int(anchor_name.split('.')[1])
+            self.anchor_positions[anchor_id] = self.get_parameter(anchor_name).get_parameter_value().double_array_value
         if len(self.anchor_positions) < 3:
             self.get_logger().error('At least 3 anchor positions are required for trilateration')
             raise ValueError('Insufficient anchor positions')
-
+        self.get_logger().info(f'Anchor positions: {self.anchor_positions}')
         self.calib_type = self.get_parameter('calibration').get_parameter_value().string_value
         self.calib_params = self.get_parameter('calib_params').get_parameter_value().double_array_value
         self.z_sign = self.get_parameter('z_sign').get_parameter_value().integer_value
@@ -176,13 +178,14 @@ class UWBLocalizer(Node):
         else:
             return raw
 
-    def multilaterate(self, ranges):
+    def multilaterate(self, ranges: dict):
         if len(ranges) < 3:
             return None
         try:
             return multilateration(ranges, self.anchor_positions, self.z_sign)
         except ValueError as e:
             self.get_logger().error(f'Error in multilateration: {e}')
+            self.get_logger().info(f"ranges{ranges.keys()}\t anchor_positions{self.anchor_positions.keys()}")
             return None
 
     def get_current_time(self):
@@ -200,6 +203,7 @@ class UWBLocalizer(Node):
             msg.max_range = self.max_range
             msg.range = dist
             self.range_pub.publish(msg)
+            self.ranges[anchor_id] = None
 
     def spin_once(self):
         try:
@@ -237,26 +241,26 @@ class UWBLocalizer(Node):
                     debug_msg.data = f'Anchor {anchor_id}: raw {raw_val:.3f} m, calibrated {dist:.3f} m'
                     self.debug_pub.publish(debug_msg)
                     # self.get_logger().info(f'Range {dist} from anchor {anchor_id}')
-            if self.get_clock().now().to_msg().sec - self.last_publication_time < self.publication_period:
+            if self.get_clock().now().nanoseconds - self.last_publication_time < self.publication_period * 1e9:
                 return
             self.publish_ranges()
-            self.last_publication_time = self.get_clock().now().to_msg().sec
-
+            self.last_publication_time = self.get_clock().now().nanoseconds
+            self.debug_pub.publish(String(data="Sending Range"))
             # Calculate and publish position
             pos = self.multilaterate(self.ranges)
             if pos is not None:
                 pose = PoseStamped()
                 pose.header.stamp = self.get_clock().now().to_msg()
                 pose.header.frame_id = self.frame_id
-                pose.pose.position.w = 1.0
-                pose.pose.position.x = pos[0]
-                pose.pose.position.y = pos[1]
-                pose.pose.position.z = pos[2] * self.z_sign
+                pose.pose.orientation.w = 1.0
+                pose.pose.orientation.x = pos[0]
+                pose.pose.orientation.y = pos[1]
+                pose.pose.orientation.z = pos[2] * self.z_sign
                 self.pose_pub.publish(pose)
 
 
         except Exception as e:
-            self.get_logger().error(f'Error in spin_once: {e}')
+            self.get_logger().error(f'Error in spin_once: {e} traceback: {traceback.format_exc()}')
 
 def main(args=None):
     rclpy.init(args=args)

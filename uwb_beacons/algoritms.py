@@ -3,6 +3,10 @@ import math
 from typing import Dict, Tuple
 import localization as lx
 
+global P
+global t
+P=lx.Project(mode='3D',solver='LSE')
+t, label = P.add_target()
 
 def solve_position(d1: float, d2: float, d3: float, z_sign: int = +1, eps: float = 1e-9, L2: float = 0, L3: float = 0) -> Tuple[float, float, float]:
     """
@@ -49,7 +53,8 @@ def multilateration(
     :param z_sign: z sign, used if there are two solutions
     :return: x, y, z
     """
-    P=lx.Project(mode='3D',solver='LSE')
+    t.measures.clear()
+    P.AnchorDic.clear()
 
     if len(raw_data) < 3:
         raise ValueError("Not enough data for trilateration")
@@ -58,11 +63,11 @@ def multilateration(
 
     matched_ids = list(set(raw_data.keys()) & set(anchor_positions.keys()))
     if len(matched_ids) < 3:
-        raise ValueError("Not enough common anchors for trilateration")
-
-    t, label = P.add_target()
+        raise ValueError(f"Not enough common anchors for trilateration: {matched_ids}")
 
     for id in matched_ids:
+        if raw_data[id] is None:
+            continue
         P.add_anchor(id, anchor_positions[id])
         t.add_measure(id, raw_data[id])
     P.solve()
