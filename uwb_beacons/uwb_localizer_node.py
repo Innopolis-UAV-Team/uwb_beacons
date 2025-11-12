@@ -231,8 +231,8 @@ class UWBLocalizer(Node):
                     msg = self.buffer.pop()
                     if msg is None:
                         continue
+                    self.get_logger().info(f"Received message: raw:{msg}")
                     message = Message(msg)
-                    self.get_logger().info(f"Received message: raw:{msg}, id:{message.id}, data:{message.data}")
                     anchor_id = message.id
                     raw_val = message.data / 1000.0  # Convert mm to meters
                     self.last_msg_time[anchor_id] = self.get_current_time()
