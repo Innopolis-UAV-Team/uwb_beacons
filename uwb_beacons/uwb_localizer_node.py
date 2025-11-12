@@ -218,7 +218,6 @@ class UWBLocalizer(Node):
             # Read available data
             for id, time in self.last_msg_time.items():
                 if time < self.get_current_time() - self.publication_period * 2:
-                    self.get_logget().info(f"Removing anchor {id} from ranges")
                     self.ranges[id] = None
                     self.ranges.pop(id)
                     self.last_msg_time[id] = 0.0
@@ -226,7 +225,6 @@ class UWBLocalizer(Node):
             if self.ser.in_waiting > 0:
                 response = self.ser.read_until(b'\xff\xff\xff\x00')
                 splitteed = response.split(b'\xff\xff\xff\x00')
-                self.get_logger().info(f'Received response: {splitteed}')
 
                 self.buffer.append(response)
                 if self.buffer.size == 0:
@@ -236,7 +234,6 @@ class UWBLocalizer(Node):
                     msg = self.buffer.pop()
                     if msg is None:
                         continue
-                    self.get_logger().info(f"Received message: raw:{msg}")
                     message = Message(msg)
                     anchor_id = message.id
                     raw_val = message.data / 1000.0  # Convert mm to meters
@@ -263,7 +260,6 @@ class UWBLocalizer(Node):
             # Calculate and publish position
             pos = self.multilaterate(self.ranges)
             if pos is not None:
-                self.debug_pub.publish(String(data="Sending Pose"))
                 pose = PoseStamped()
                 pose.header.stamp = self.get_clock().now().to_msg()
                 pose.header.frame_id = self.frame_id
