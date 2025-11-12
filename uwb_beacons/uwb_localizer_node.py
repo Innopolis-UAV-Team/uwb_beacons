@@ -240,7 +240,8 @@ class UWBLocalizer(Node):
                     if anchor_id is None:
                         continue
 
-                    dist = self.calibrate(raw_val)
+                    # dist = self.calibrate(raw_val)
+                    dist = raw_val
                     self.ranges[anchor_id] = dist
                     if dist < self.min_range or dist > self.max_range:
                         self.get_logger().warn(f'Range {dist} from anchor {anchor_id} out of bounds ({self.min_range}, {self.max_range})')
