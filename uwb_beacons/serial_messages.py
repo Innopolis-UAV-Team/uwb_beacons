@@ -4,7 +4,7 @@ from typing import Optional
 
 class Message:
     def __init__(self, data: bytes):
-        self.id, self.data = struct.unpack('>BI', data)
+        self.id, self.data = struct.unpack('<BI', data)
 
     def __str__(self):
         return f"id: {self.id}, data: {self.data}"
@@ -19,11 +19,12 @@ def decode(data: bytes) -> int:
     return i
 
 class CircularBuffer:
-    def __init__(self, size: int):
+    def __init__(self, size: int, element_size: int = 5):
         self.buffer = [b'\x00'for i in range(size)]
         self.head = 0
         self.size = 0
         self.tail = 0
+        self.element_size = element_size
 
     def append(self, item: Optional[bytes]):
         if item is None:
@@ -31,6 +32,8 @@ class CircularBuffer:
         items = item.split(b'\xff\xff\xff\x00')
         for item in items:
             if len(item) == 0:
+                continue
+            if len(item) > self.element_size:
                 continue
             self.buffer[self.head] = item
             self.head = (self.head + 1) % len(self.buffer)

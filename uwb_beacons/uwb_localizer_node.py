@@ -89,7 +89,7 @@ class UWBLocalizer(Node):
         self.ranges = {}
         self.last_msg_time = {}
         self.last_publication_time = 0.0
-        self.buffer = CircularBuffer(100)
+        self.buffer = CircularBuffer(100, element_size=7)
 
     def __parse_parameter(self, param_name, default_value):
         descriptor = None
@@ -130,7 +130,7 @@ class UWBLocalizer(Node):
         if self.calib_type not in valid_calib_types:
             self.get_logger().warn(f'Invalid calibration type: {self.calib_type}. Using linear.')
             self.calib_type = 'linear'
-        
+
         # Validate calibration parameters based on type
         if self.calib_type == 'linear' and len(self.calib_params) != 2:
             self.get_logger().warn('Linear calibration requires 2 parameters. Using defaults.')
@@ -218,16 +218,21 @@ class UWBLocalizer(Node):
             # Read available data
             for id, time in self.last_msg_time.items():
                 if time < self.get_current_time() - self.publication_period * 2:
+                    self.get_logget().info(f"Removing anchor {id} from ranges")
                     self.ranges[id] = None
                     self.ranges.pop(id)
                     self.last_msg_time[id] = 0.0
 
             if self.ser.in_waiting > 0:
-                response = self.ser.read_until(b'\xFF\xFF\xFF\x00')
+                response = self.ser.read_until(b'\xff\xff\xff\x00')
+                splitteed = response.split(b'\xff\xff\xff\x00')
+                self.get_logger().info(f'Received response: {splitteed}')
+
                 self.buffer.append(response)
                 if self.buffer.size == 0:
+                    self.get_logger().info("Buffer is empty")
                     return
-                for i in range(self.buffer.size):
+                while self.buffer.size > 0:
                     msg = self.buffer.pop()
                     if msg is None:
                         continue
