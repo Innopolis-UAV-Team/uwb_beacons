@@ -202,6 +202,7 @@ class UWBLocalizer(Node):
             if dist is None:
                 self.get_logger().info(f"Anchor {anchor_id} is silent")
                 continue
+            self.get_logger().info(f"Sending range for anchor {anchor_id}, dist {dist}")
             msg = Range()
             msg.header.stamp = self.get_clock().now().to_msg()
             msg.header.frame_id = f"anchor_{anchor_id}"
