@@ -232,6 +232,7 @@ class UWBLocalizer(Node):
                     msg = self.buffer.pop()
                     if msg is None:
                         continue
+                    self.get_logger().info(f"Received message: {msg}")
                     message = Message(msg)
                     anchor_id = message.id
                     raw_val = message.data / 1000.0  # Convert mm to meters
