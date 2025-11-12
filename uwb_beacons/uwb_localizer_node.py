@@ -194,7 +194,7 @@ class UWBLocalizer(Node):
         return self.get_clock().now().nanoseconds
 
     def publish_ranges(self):
-        if self.ranges is None:
+        if len(self.ranges.keys()) == 0:
             self.get_logger().warn("No ranges received")
             return
         self.get_logger().info("Sending ranges")
