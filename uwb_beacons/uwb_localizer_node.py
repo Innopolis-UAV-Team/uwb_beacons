@@ -72,7 +72,7 @@ class UWBLocalizer(Node):
         self.debug_pub.publish(String(data='No data received'))
 
         try:
-            self.ser = serial.Serial(port, baud, timeout=timeout)
+            self.ser = serial.Serial(port, baud, timeout=timeout, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, parity="E")
             self.get_logger().info(f'Connected to UWB device on {port} at {baud} baud')
             self.debug_pub.publish(String(data=f'Connected to UWB device on {port} at {baud} baud'))
         except Exception as e:
