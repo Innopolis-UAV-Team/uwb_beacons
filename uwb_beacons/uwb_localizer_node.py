@@ -215,7 +215,7 @@ class UWBLocalizer(Node):
 
     def spin_once(self):
         try:
-            self.ser.write(b'\x01\x00\x00\x00d\xff\xff\xff\x00')
+            self.ser.write(b'\x01\x00\x00\x00\0x64\xff\xff\xff\x00')
             # Read available data
             for id, time in self.last_msg_time.items():
                 if time < self.get_current_time() - self.publication_period * 2:
