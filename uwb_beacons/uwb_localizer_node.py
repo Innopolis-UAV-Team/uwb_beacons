@@ -218,6 +218,7 @@ class UWBLocalizer(Node):
             for id, time in self.last_msg_time.items():
                 if time < self.get_current_time() - self.publication_period * 2:
                     self.ranges[id] = None
+                    self.ranges.pop(id)
                     self.last_msg_time[id] = 0.0
 
             if self.ser.in_waiting > 0:
