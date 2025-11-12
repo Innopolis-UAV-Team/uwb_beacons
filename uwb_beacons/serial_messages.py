@@ -4,8 +4,7 @@ from typing import Optional
 
 class Message:
     def __init__(self, data: bytes):
-        self.id =  struct.unpack('B', data[0:1])[0]
-        self.data = struct.unpack('<I', data[1:5])[0]
+        self.id, self.data = struct.unpack('>BI', data)
 
     def __str__(self):
         return f"id: {self.id}, data: {self.data}"
