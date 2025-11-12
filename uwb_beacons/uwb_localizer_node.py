@@ -215,7 +215,6 @@ class UWBLocalizer(Node):
 
     def spin_once(self):
         try:
-            self.ser.write(b'\x01\x00\x00\x00\x60\xff\xff\xff\x00')
             # Read available data
             for id, time in self.last_msg_time.items():
                 if time < self.get_current_time() - self.publication_period * 2:
@@ -241,8 +240,7 @@ class UWBLocalizer(Node):
                     if anchor_id is None:
                         continue
 
-                    # dist = self.calibrate(raw_val)
-                    dist = raw_val
+                    dist = self.calibrate(raw_val)
                     self.ranges[anchor_id] = dist
                     if dist < self.min_range or dist > self.max_range:
                         self.get_logger().warn(f'Range {dist} from anchor {anchor_id} out of bounds ({self.min_range}, {self.max_range})')
