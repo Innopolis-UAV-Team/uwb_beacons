@@ -51,11 +51,12 @@ def multilateration(raw_data: dict[int, float], anchor_positions: dict[int, Tupl
     P=lx.Project(mode='3D',solver='LSE')
     non_zero_data = {}
     for id in raw_data.keys():
-        if raw_data[id] is not None:
-            non_zero_data[id] = raw_data[id]
+        if raw_data[id] is None:
+            continue
+        non_zero_data[id] = raw_data[id]
 
     if len(non_zero_data) < 3:
-        raise ValueError(f"Not enough data for trilateration {non_zero_data}")
+        raise ValueError(f"Not enough data for trilateration non zero:{non_zero_data} input:{raw_data}")
     if len(anchor_positions) < 3:
         raise ValueError(f"Not enough anchor positions for trilateration {anchor_positions}")
 
