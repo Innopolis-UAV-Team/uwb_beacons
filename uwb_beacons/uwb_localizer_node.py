@@ -210,7 +210,6 @@ class UWBLocalizer(Node):
             msg.max_range = self.max_range
             msg.range = dist
             self.range_pub.publish(msg)
-            self.ranges[anchor_id] = None
 
     def spin_once(self):
         try:
@@ -223,12 +222,8 @@ class UWBLocalizer(Node):
 
             if self.ser.in_waiting > 0:
                 response = self.ser.read_until(b'\xff\xff\xff\x00')
-                splitteed = response.split(b'\xff\xff\xff\x00')
-
                 self.buffer.append(response)
-                if self.buffer.size == 0:
-                    self.get_logger().info("Buffer is empty")
-                    return
+
                 while self.buffer.size > 0:
                     msg = self.buffer.pop()
                     if msg is None:
