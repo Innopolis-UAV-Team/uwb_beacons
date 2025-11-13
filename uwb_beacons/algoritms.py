@@ -3,10 +3,6 @@ import math
 from typing import Dict, Tuple
 import localization as lx
 
-global P
-global t
-P=lx.Project(mode='3D',solver='LSE')
-t, label = P.add_target()
 
 def solve_position(d1: float, d2: float, d3: float, z_sign: int = +1, eps: float = 1e-9, L2: float = 0, L3: float = 0) -> Tuple[float, float, float]:
     """
@@ -44,8 +40,7 @@ def calibrated_qubic(a, b, c, d, x):
     return a * x**3 + b * x**2 + c * x + d
 
 
-def multilateration(
-    raw_data: Dict[int, float], anchor_positions: Dict[int, Tuple[float, float, float]], z_sign: int = +1) -> Tuple[float, float, float]:
+def multilateration(raw_data: dict[int, float], anchor_positions: dict[int, Tuple[float, float, float]], z_sign: int = 0) -> Tuple[float, float, float]:
     """
     Trilateration algorithm
     :param raw_data: raw data from the sensor
@@ -53,8 +48,7 @@ def multilateration(
     :param z_sign: z sign, used if there are two solutions
     :return: x, y, z
     """
-    t.measures.clear()
-    P.AnchorDic.clear()
+    P=lx.Project(mode='3D',solver='LSE')
 
     if len(raw_data) < 3:
         raise ValueError("Not enough data for trilateration")
@@ -63,18 +57,25 @@ def multilateration(
 
     matched_ids = list(set(raw_data.keys()) & set(anchor_positions.keys()))
     if len(matched_ids) < 3:
-        raise ValueError(f"Not enough common anchors for trilateration: {matched_ids}")
+        raise ValueError("Not enough common anchors for trilateration")
 
-    for id in matched_ids:
-        if raw_data[id] is None:
-            continue
+    anchors_ids = list(raw_data.keys())
+    anchors_ids.sort()
+    raw_data_ids = list(raw_data.keys())
+    raw_data_ids.sort()
+    anchors_ids = list(set(anchors_ids) & set(raw_data_ids))
+    if len(anchors_ids) < 3:
+        raise ValueError("Not enough common anchors for trilateration")
+    for id in anchors_ids:
         P.add_anchor(id, anchor_positions[id])
+    t, label = P.add_target()
+    for id in anchors_ids:
         t.add_measure(id, raw_data[id])
+    for measure in t.measures:
+        print(f"Measure {measure}")
+    for anchor in P.AnchorDic:
+        print(f"Anchor {anchor}: {P.AnchorDic[anchor]}")
     P.solve()
-
-    if len(matched_ids) == 3:
-        # If there are only 3 anchors, use the z_sign parameter to choose the solution
-        if t.loc.z * z_sign < 0:
-            t.loc.z = -t.loc.z
-
+    if (z_sign != 0):
+        t.loc.z = abs(t.loc.z) * z_sign
     return t.loc.x, t.loc.y, t.loc.z
