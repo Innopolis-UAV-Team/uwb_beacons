@@ -1,7 +1,7 @@
 uwb_localizer_node:
   ros__parameters:
     # Serial communication parameters
-    port: "/dev/ttyUSB0"
+    port: "/dev/ttyS4"
     baud: 115200
     timeout: 1.0
 
@@ -23,6 +23,7 @@ uwb_localizer_node:
     # Calibration parameters
     calibration: "none"  # linear, quadratic, cubic, none
     calib_params: [1.0, 0.0]  # [a, b] for linear, [a, b, c] for quadratic, [a, b, c, d] for cubic
+
 
     # Anchor positions (x, y, z in meters)
     anchors_names: ["anchor.1", "anchor.2", "anchor.3", "anchor.4"]
