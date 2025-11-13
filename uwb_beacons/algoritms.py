@@ -69,7 +69,7 @@ def multilateration(raw_data: dict[int, float], anchor_positions: dict[int, Tupl
     raw_data_ids.sort()
     anchors_ids = list(set(anchors_ids) & set(raw_data_ids))
     if len(anchors_ids) < 3:
-        raise ValueError("Not enough common anchors for trilateration")
+        raise ValueError(f"Not enough common anchors for trilateration {anchors_ids}")
     for id in anchors_ids:
         P.add_anchor(id, anchor_positions[id])
     t, label = P.add_target()
