@@ -55,13 +55,13 @@ def multilateration(raw_data: dict[int, float], anchor_positions: dict[int, Tupl
             non_zero_data[id] = raw_data[id]
 
     if len(non_zero_data) < 3:
-        raise ValueError("Not enough data for trilateration")
+        raise ValueError(f"Not enough data for trilateration {non_zero_data}")
     if len(anchor_positions) < 3:
-        raise ValueError("Not enough anchor positions for trilateration")
+        raise ValueError(f"Not enough anchor positions for trilateration {anchor_positions}")
 
     matched_ids = list(set(non_zero_data.keys()) & set(anchor_positions.keys()))
     if len(matched_ids) < 3:
-        raise ValueError("Not enough common anchors for trilateration")
+        raise ValueError(f"Not enough common anchors for trilateration {matched_ids}")
 
     anchors_ids = list(non_zero_data.keys())
     anchors_ids.sort()
