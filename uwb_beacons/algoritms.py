@@ -49,19 +49,23 @@ def multilateration(raw_data: dict[int, float], anchor_positions: dict[int, Tupl
     :return: x, y, z
     """
     P=lx.Project(mode='3D',solver='LSE')
+    non_zero_data = {}
+    for id in raw_data.keys():
+        if raw_data[id] is not None:
+            non_zero_data[id] = raw_data[id]
 
-    if len(raw_data) < 3:
+    if len(non_zero_data) < 3:
         raise ValueError("Not enough data for trilateration")
     if len(anchor_positions) < 3:
         raise ValueError("Not enough anchor positions for trilateration")
 
-    matched_ids = list(set(raw_data.keys()) & set(anchor_positions.keys()))
+    matched_ids = list(set(non_zero_data.keys()) & set(anchor_positions.keys()))
     if len(matched_ids) < 3:
         raise ValueError("Not enough common anchors for trilateration")
 
-    anchors_ids = list(raw_data.keys())
+    anchors_ids = list(non_zero_data.keys())
     anchors_ids.sort()
-    raw_data_ids = list(raw_data.keys())
+    raw_data_ids = list(non_zero_data.keys())
     raw_data_ids.sort()
     anchors_ids = list(set(anchors_ids) & set(raw_data_ids))
     if len(anchors_ids) < 3:
@@ -70,7 +74,7 @@ def multilateration(raw_data: dict[int, float], anchor_positions: dict[int, Tupl
         P.add_anchor(id, anchor_positions[id])
     t, label = P.add_target()
     for id in anchors_ids:
-        t.add_measure(id, raw_data[id])
+        t.add_measure(id, non_zero_data[id])
     for measure in t.measures:
         print(f"Measure {measure}")
     for anchor in P.AnchorDic:
