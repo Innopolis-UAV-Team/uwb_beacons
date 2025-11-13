@@ -187,7 +187,6 @@ class UWBLocalizer(Node):
             return multilateration(ranges, self.anchor_positions, self.z_sign)
         except ValueError as e:
             self.get_logger().error(f'Error in multilateration: {e}')
-            self.get_logger().info(f"ranges{ranges.keys()}\t anchor_positions{self.anchor_positions.keys()}")
             return None
 
     def get_current_time(self):
@@ -259,6 +258,7 @@ class UWBLocalizer(Node):
             self.last_publication_time = self.get_current_time()
             # Calculate and publish position
             pos = self.multilaterate(self.ranges)
+            self.get_logger().info(f"pos: {pos}")
             if pos is not None:
                 pose = PoseStamped()
                 pose.header.stamp = self.get_clock().now().to_msg()
