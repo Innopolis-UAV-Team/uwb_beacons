@@ -251,24 +251,26 @@ class UWBLocalizer(Node):
                     debug_msg = String()
                     debug_msg.data = f'Anchor {anchor_id}: raw {raw_val:.3f} m, calibrated {dist:.3f} m'
                     self.debug_pub.publish(debug_msg)
-                    # self.get_logger().info(f'Range {dist} from anchor {anchor_id}')
+
+            # send messages according to the publication period
             if self.get_current_time() - self.last_publication_time < self.publication_period:
                 return
             self.publish_ranges()
             self.last_publication_time = self.get_current_time()
+
             # Calculate and publish position
             pos = self.multilaterate(self.ranges)
             self.get_logger().info(f"pos: {pos}")
-            if pos is not None:
-                pose = PoseStamped()
-                pose.header.stamp = self.get_clock().now().to_msg()
-                pose.header.frame_id = self.frame_id
-                pose.pose.orientation.w = 1.0
-                pose.pose.orientation.x = pos[0]
-                pose.pose.orientation.y = pos[1]
-                pose.pose.orientation.z = pos[2] * self.z_sign
-                self.pose_pub.publish(pose)
-
+            if pos is None:
+                return
+            pose = PoseStamped()
+            pose.header.stamp = self.get_clock().now().to_msg()
+            pose.header.frame_id = self.frame_id
+            pose.pose.orientation.w = 1.0
+            pose.pose.orientation.x = pos[0]
+            pose.pose.orientation.y = pos[1]
+            pose.pose.orientation.z = pos[2] * self.z_sign
+            self.pose_pub.publish(pose)
 
         except Exception as e:
             self.get_logger().error(f'Error in spin_once: {e} traceback: {traceback.format_exc()}')
