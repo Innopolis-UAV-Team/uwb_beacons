@@ -12,18 +12,10 @@ from std_msgs.msg import String
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType
 import pymap3d as pm
 
-from uwb_beacons.algoritms import multilateration
+from uwb_beacons.algoritms import multilateration, \
+                            calibrated_linear, calibrated_quadratic, calibrated_cubic
 from uwb_beacons.serial_messages import CircularBuffer, Message
 from uwb_beacons.parameters import DEFAULT_PARAMS
-
-def calibrated_linear(raw, a, b):
-    return a * raw + b
-
-def calibrated_quadratic(raw, a, b, c):
-    return a * raw**2 + b * raw + c
-
-def calibrated_cubic(raw, a, b, c, d):
-    return a * raw**3 + b * raw**2 + c * raw + d
 
 class UWBLocalizer(Node):
     def __init__(self):
@@ -89,7 +81,6 @@ class UWBLocalizer(Node):
         self.timer = self.create_timer(timer_period, self.spin_once)
 
         # Initialize buffer and ranges
-        # self.buffer = bytearray()
         self.ranges = {}
         self.last_msg_time = {}
         self.last_publication_time = 0.0
@@ -167,6 +158,47 @@ class UWBLocalizer(Node):
         except Exception as e:
             self.get_logger().error(f'Error in spin_once: {e} traceback: {traceback.format_exc()}')
 
+    def calibrate(self, raw: float) -> float:
+        if self.calib_type == "linear":
+            return calibrated_linear(raw, *self.calib_params)
+        elif self.calib_type == "quadratic":
+            return calibrated_quadratic(raw, *self.calib_params)
+        elif self.calib_type == "cubic":
+            return calibrated_cubic(raw, *self.calib_params)
+        else:
+            return raw
+
+    def multilaterate(self, ranges: dict):
+        if len(ranges) < 3:
+            return None
+        try:
+            return multilateration(ranges, self.anchor_positions, self.z_sign)
+        except ValueError as e:
+            self.get_logger().error(f'Error in multilateration: {e}')
+            return None
+
+    def get_current_time(self):
+        return self.get_clock().now().nanoseconds
+
+    def publish_ranges(self):
+        if len(self.ranges.keys()) == 0:
+            self.get_logger().warn("No ranges received")
+            return
+        self.get_logger().info("Sending ranges")
+        for anchor_id, dist in self.ranges.items():
+            if dist is None:
+                self.get_logger().info(f"Anchor {anchor_id} is silent")
+                continue
+            self.get_logger().info(f"Sending range for anchor {anchor_id}, dist {dist}")
+            msg = Range()
+            msg.header.stamp = self.get_clock().now().to_msg()
+            msg.header.frame_id = f"anchor_{anchor_id}"
+            msg.field_of_view = self.field_of_view
+            msg.min_range = self.min_range
+            msg.max_range = self.max_range
+            msg.range = dist
+            self.range_pub.publish(msg)
+
     def __parse_parameter(self, param_name, default_value):
         descriptor = None
         if   isinstance(default_value, dict):
@@ -238,54 +270,6 @@ class UWBLocalizer(Node):
         for param_name, default_value, descriptor in self.parameters:
             value = self.get_parameter(param_name).get_parameter_value()
             print(f'{descriptor}\n\t{param_name}: {value}\n')
-
-    def parse_message(self, data: bytearray) -> tuple[int, float]|tuple[None, None]:
-        if len(data) < 5:
-            return None, None
-        anchor_id = data[0]
-        raw_val = struct.unpack("<I", data[1:5])[0] / 1000.0  # Convert mm to meters
-        return anchor_id, raw_val
-
-    def calibrate(self, raw: float) -> float:
-        if self.calib_type == "linear":
-            return calibrated_linear(raw, *self.calib_params)
-        elif self.calib_type == "quadratic":
-            return calibrated_quadratic(raw, *self.calib_params)
-        elif self.calib_type == "cubic":
-            return calibrated_cubic(raw, *self.calib_params)
-        else:
-            return raw
-
-    def multilaterate(self, ranges: dict):
-        if len(ranges) < 3:
-            return None
-        try:
-            return multilateration(ranges, self.anchor_positions, self.z_sign)
-        except ValueError as e:
-            self.get_logger().error(f'Error in multilateration: {e}')
-            return None
-
-    def get_current_time(self):
-        return self.get_clock().now().nanoseconds
-
-    def publish_ranges(self):
-        if len(self.ranges.keys()) == 0:
-            self.get_logger().warn("No ranges received")
-            return
-        self.get_logger().info("Sending ranges")
-        for anchor_id, dist in self.ranges.items():
-            if dist is None:
-                self.get_logger().info(f"Anchor {anchor_id} is silent")
-                continue
-            self.get_logger().info(f"Sending range for anchor {anchor_id}, dist {dist}")
-            msg = Range()
-            msg.header.stamp = self.get_clock().now().to_msg()
-            msg.header.frame_id = f"anchor_{anchor_id}"
-            msg.field_of_view = self.field_of_view
-            msg.min_range = self.min_range
-            msg.max_range = self.max_range
-            msg.range = dist
-            self.range_pub.publish(msg)
 
 def main(args=None):
     rclpy.init(args=args)

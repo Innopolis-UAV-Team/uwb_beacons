@@ -33,10 +33,10 @@ def solve_position(d1: float, d2: float, d3: float, z_sign: int = +1, eps: float
 def calibrated_linear(k, b, x):
     return k * x + b
 
-def calibrated_quad(a, b, c, x):
+def calibrated_quadratic(a, b, c, x):
     return a * x**2 + b * x + c 
 
-def calibrated_qubic(a, b, c, d, x):
+def calibrated_cubic(a, b, c, d, x):
     return a * x**3 + b * x**2 + c * x + d
 
 
