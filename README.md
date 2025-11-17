@@ -126,6 +126,14 @@ Add parameters for each connected anchor in the config file and uwb_beacons/para
    "anchors_names": ["anchor.5", "anchor.6", "anchor.7", "anchor.4"]
 ```
 
+Define the anchors ENU coordinate system in the launch file:
+
+```yaml
+latitude: 55.760372
+longitude: 48.758703
+altitude: 0.0
+```
+
 ### Calibration Parameters
 
 Adjust calibration parameters in the launch file:
@@ -141,6 +149,7 @@ calib_params: [0.001, 0.0]  # [a, b] for linear: distance = a * raw + b
 - `/uwb/pose` (geometry_msgs/PoseStamped): Calculated position
 - `/uwb/ranges` (sensor_msgs/Range): Individual range measurements
 - `/uwb/debug` (std_msgs/String): Debug information
+- `/uwb/gps` (nav_msgs/Odometry): GPS position
 
 ### Example Usage
 
@@ -150,6 +159,9 @@ ros2 topic list
 
 # Monitor position
 ros2 topic echo /uwb/pose
+
+# Monitor GPS position
+ros2 topic echo /uwb/gps
 
 # Monitor ranges
 ros2 topic echo /uwb/ranges
@@ -206,24 +218,34 @@ ros2 topic echo /uwb/debug
 ### File Structure
 
 ```
-RTK-DW-main/
-├── scripts/
-│   └── uwb_beacons_ros2.py    # Main ROS2 node
+uwb_beacons/
+├── uwb_beacons /
+│   ├── algoritms.py
+│   ├── parameters.py
+│   ├── serial_messages.py
+│   ├── uwb_localizer_node.py
+├── resource/
+│   └── uwb_beacons
+├── config/
+│   ├── README.md
+│   └── uwb_beacons_params_example.yaml
+|   └── uwb_beacons_params.yaml
 ├── launch/
-│   └── uwb_beacons_ros2.launch.py  # Launch file
+|   └── uwb_beacons.launch.py
 ├── package.xml                   # ROS2 package definition
 ├── CMakeLists.txt               # Build configuration
 ├── Dockerfile                   # Docker image definition
 ├── docker-compose.yml           # Docker Compose configuration
 ├── build_and_run.sh             # Build/run script
-├── test_node.py                 # Test script
-├── backup_ros1_files/           # Backup of original ROS1 files
-└── uwb_beacons/                 # UWB hardware code
+├── setup.py                     # Python package setup
+├── setup.cfg                    # Python package configuration
+├── requirements.txt             # Python package requirements
+└── README.md                    # Project README
 ```
 
 ### Adding New Features
 
-1. Modify the Python node in `scripts/uwb_beacons_ros2.py`
+1. Modify the Python node in `uwb_beacons/uwb_localizer_node.py`
 2. Update launch parameters if needed
 3. Rebuild the Docker image: `docker-compose build`
 4. Test with: `docker-compose up uwb-beacons`
