@@ -23,7 +23,7 @@ class UWBLocalizer(Node):
         self.__declare_parameters()
         self.declare_parameters(namespace='', parameters=self.parameters)
         self.__list_params()
-        self.get_logger().info(f'Loaded parameters')
+
         # Get parameter values
         port = self.get_parameter('port').get_parameter_value().string_value
         baud = self.get_parameter('baud').get_parameter_value().integer_value
@@ -52,6 +52,7 @@ class UWBLocalizer(Node):
         self.lat_s = self.get_parameter('latitude').get_parameter_value().double_value
         self.alt_s = self.get_parameter('altitude').get_parameter_value().double_value
 
+        self.publish_gps = any([self.lat_s, self.lon_s, self.alt_s])
         # Validate parameters
         self._validate_parameters()
 
@@ -142,6 +143,8 @@ class UWBLocalizer(Node):
             pose.pose.orientation.z = pos[2] * self.z_sign
             self.pose_pub.publish(pose)
 
+            if not self.publish_gps:
+                return
             # Publish fake GPS
             lat, lon, alt = pm.enu2geodetic(pos[0], pos[1], pos[2],
                                             self.lat_s, self.lon_s, self.alt_s)
@@ -267,9 +270,35 @@ class UWBLocalizer(Node):
 
     def __list_params(self):
         """List all parameters"""
+        entries = []
         for param_name, default_value, descriptor in self.parameters:
-            value = self.get_parameter(param_name).get_parameter_value()
-            print(f'{descriptor}\n\t{param_name}: {value}\n')
+            p = self.get_parameter(param_name).get_parameter_value()
+
+            if descriptor.type == ParameterType.PARAMETER_DOUBLE:
+                value = p.double_value
+            elif descriptor.type == ParameterType.PARAMETER_INTEGER:
+                value = p.integer_value
+            elif descriptor.type == ParameterType.PARAMETER_STRING:
+                value = p.string_value
+            elif descriptor.type == ParameterType.PARAMETER_DOUBLE_ARRAY:
+                value = list(p.double_array_value)
+            elif descriptor.type == ParameterType.PARAMETER_INTEGER_ARRAY:
+                value = list(p.integer_array_value)
+            elif descriptor.type == ParameterType.PARAMETER_STRING_ARRAY:
+                value = list(p.string_array_value)
+            else:
+                value = "<unknown>"
+
+            entries.append((param_name, value))
+
+        # Compute max width for alignment
+        max_len = max(len(name) for name, _ in entries)
+
+        parameters_str = "Parameters:\n"
+        for name, value in entries:
+            parameters_str += f"{name:<{max_len}} : {value}\n"
+
+        self.get_logger().info(parameters_str)
 
 def main(args=None):
     rclpy.init(args=args)
