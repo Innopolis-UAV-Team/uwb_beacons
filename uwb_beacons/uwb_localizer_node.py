@@ -7,10 +7,13 @@ import serial
 import struct
 import numpy as np
 from geometry_msgs.msg import PoseStamped
-from sensor_msgs.msg import Range
+from sensor_msgs.msg import Range, NavSatFix, Imu
 from std_msgs.msg import String
 from scipy.optimize import least_squares
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType
+
+import pyproj
+import pymap3d as pm
 
 from uwb_beacons.algoritms import multilateration
 from uwb_beacons.serial_messages import CircularBuffer, Message
@@ -55,15 +58,19 @@ class UWBLocalizer(Node):
         self.publication_period = (1 / self.get_parameter('publication_frequency').
                                                     get_parameter_value().double_value) # seconds
         self.publication_period = self.publication_period * 1e9 # nanoseconds
-        # Anchor positions are already set above
+
+        self.lon_s = self.get_parameter('longitude').get_parameter_value().double_value
+        self.lat_s = self.get_parameter('latitude').get_parameter_value().double_value
+        self.alt_s = self.get_parameter('altitude').get_parameter_value().double_value
 
         # Validate parameters
         self._validate_parameters()
-        
+
         # Create publishers
         self.pose_pub = self.create_publisher(PoseStamped, 'uwb/pose', 10)
         self.range_pub = self.create_publisher(Range, 'uwb/ranges', 10)
         self.debug_pub = self.create_publisher(String, 'uwb/debug', 10)
+        self.fake_gps_pub = self.create_publisher(NavSatFix, 'uwb/gps', 10)
 
         self.get_logger().info(f'Anchor positions: {self.anchor_positions}')
         self.get_logger().info(f'Calibration type: {self.calib_type}, params: {self.calib_params}')
@@ -266,6 +273,19 @@ class UWBLocalizer(Node):
             pose.pose.orientation.y = pos[1]
             pose.pose.orientation.z = pos[2] * self.z_sign
             self.pose_pub.publish(pose)
+
+            # Publish fake GPS
+            lat, lon, alt = pm.enu2geodetic(pos[0], pos[1], pos[2],
+                                            self.lat_s, self.lon_s, self.alt_s)
+
+            nav = NavSatFix()
+
+            nav.header.stamp = self.get_clock().now().to_msg()
+            nav.header.frame_id = self.frame_id
+            nav.latitude = lat
+            nav.longitude = lon
+            nav.altitude = alt
+            self.fake_gps_pub.publish(nav)
 
         except Exception as e:
             self.get_logger().error(f'Error in spin_once: {e} traceback: {traceback.format_exc()}')
