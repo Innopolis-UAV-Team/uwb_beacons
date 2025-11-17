@@ -1,3 +1,4 @@
 Localization
 numpy
 pyserial
+pymap3d

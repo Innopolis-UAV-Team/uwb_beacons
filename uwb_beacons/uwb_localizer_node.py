@@ -7,12 +7,9 @@ import serial
 import struct
 import numpy as np
 from geometry_msgs.msg import PoseStamped
-from sensor_msgs.msg import Range, NavSatFix, Imu
+from sensor_msgs.msg import Range, NavSatFix
 from std_msgs.msg import String
-from scipy.optimize import least_squares
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType
-
-import pyproj
 import pymap3d as pm
 
 from uwb_beacons.algoritms import multilateration

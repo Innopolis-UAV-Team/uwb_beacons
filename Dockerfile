@@ -25,7 +25,8 @@ RUN pip3 install --no-cache-dir \
     numpy \
     scipy \
     shapely \
-    Localization
+    Localization \
+    pymap3d
 
 # Install ROS2 Python packages and build tools
 RUN apt-get update && apt-get install -y \
