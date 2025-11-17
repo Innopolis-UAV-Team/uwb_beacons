@@ -95,6 +95,78 @@ class UWBLocalizer(Node):
         self.last_publication_time = 0.0
         self.buffer = CircularBuffer(100, element_size=7)
 
+    def spin_once(self):
+        try:
+            # Read available data
+            for id, time in self.last_msg_time.items():
+                if time < self.get_current_time() - self.publication_period * 2:
+                    self.ranges[id] = None
+                    self.ranges.pop(id)
+                    self.last_msg_time[id] = 0.0
+
+            if self.ser.in_waiting > 0:
+                response = self.ser.read_until(b'\xff\xff\xff\x00')
+                self.buffer.append(response)
+
+                while self.buffer.size > 0:
+                    msg = self.buffer.pop()
+                    if msg is None:
+                        continue
+                    message = Message(msg)
+                    anchor_id = message.id
+                    raw_val = message.data / 1000.0  # Convert mm to meters
+                    self.last_msg_time[anchor_id] = self.get_current_time()
+
+                    if anchor_id is None:
+                        continue
+
+                    dist = self.calibrate(raw_val)
+                    self.ranges[anchor_id] = dist
+                    if dist < self.min_range or dist > self.max_range:
+                        self.get_logger().warn(f'Range {dist} from anchor {anchor_id} out of bounds ({self.min_range}, {self.max_range})')
+                        self.ranges[anchor_id] = None
+                        continue
+                    # Publish debug message
+                    debug_msg = String()
+                    debug_msg.data = f'Anchor {anchor_id}: raw {raw_val:.3f} m, calibrated {dist:.3f} m'
+                    self.debug_pub.publish(debug_msg)
+
+            # send messages according to the publication period
+            if self.get_current_time() - self.last_publication_time < self.publication_period:
+                return
+            self.publish_ranges()
+            self.last_publication_time = self.get_current_time()
+
+            # Calculate and publish position
+            pos = self.multilaterate(self.ranges)
+            self.get_logger().info(f"pos: {pos}")
+            if pos is None:
+                return
+            pose = PoseStamped()
+            pose.header.stamp = self.get_clock().now().to_msg()
+            pose.header.frame_id = self.frame_id
+            pose.pose.orientation.w = 1.0
+            pose.pose.orientation.x = pos[0]
+            pose.pose.orientation.y = pos[1]
+            pose.pose.orientation.z = pos[2] * self.z_sign
+            self.pose_pub.publish(pose)
+
+            # Publish fake GPS
+            lat, lon, alt = pm.enu2geodetic(pos[0], pos[1], pos[2],
+                                            self.lat_s, self.lon_s, self.alt_s)
+
+            nav = NavSatFix()
+
+            nav.header.stamp = self.get_clock().now().to_msg()
+            nav.header.frame_id = self.frame_id
+            nav.latitude = lat
+            nav.longitude = lon
+            nav.altitude = alt
+            self.fake_gps_pub.publish(nav)
+
+        except Exception as e:
+            self.get_logger().error(f'Error in spin_once: {e} traceback: {traceback.format_exc()}')
+
     def __parse_parameter(self, param_name, default_value):
         descriptor = None
         if   isinstance(default_value, dict):
@@ -214,78 +286,6 @@ class UWBLocalizer(Node):
             msg.max_range = self.max_range
             msg.range = dist
             self.range_pub.publish(msg)
-
-    def spin_once(self):
-        try:
-            # Read available data
-            for id, time in self.last_msg_time.items():
-                if time < self.get_current_time() - self.publication_period * 2:
-                    self.ranges[id] = None
-                    self.ranges.pop(id)
-                    self.last_msg_time[id] = 0.0
-
-            if self.ser.in_waiting > 0:
-                response = self.ser.read_until(b'\xff\xff\xff\x00')
-                self.buffer.append(response)
-
-                while self.buffer.size > 0:
-                    msg = self.buffer.pop()
-                    if msg is None:
-                        continue
-                    message = Message(msg)
-                    anchor_id = message.id
-                    raw_val = message.data / 1000.0  # Convert mm to meters
-                    self.last_msg_time[anchor_id] = self.get_current_time()
-
-                    if anchor_id is None:
-                        continue
-
-                    dist = self.calibrate(raw_val)
-                    self.ranges[anchor_id] = dist
-                    if dist < self.min_range or dist > self.max_range:
-                        self.get_logger().warn(f'Range {dist} from anchor {anchor_id} out of bounds ({self.min_range}, {self.max_range})')
-                        self.ranges[anchor_id] = None
-                        continue
-                    # Publish debug message
-                    debug_msg = String()
-                    debug_msg.data = f'Anchor {anchor_id}: raw {raw_val:.3f} m, calibrated {dist:.3f} m'
-                    self.debug_pub.publish(debug_msg)
-
-            # send messages according to the publication period
-            if self.get_current_time() - self.last_publication_time < self.publication_period:
-                return
-            self.publish_ranges()
-            self.last_publication_time = self.get_current_time()
-
-            # Calculate and publish position
-            pos = self.multilaterate(self.ranges)
-            self.get_logger().info(f"pos: {pos}")
-            if pos is None:
-                return
-            pose = PoseStamped()
-            pose.header.stamp = self.get_clock().now().to_msg()
-            pose.header.frame_id = self.frame_id
-            pose.pose.orientation.w = 1.0
-            pose.pose.orientation.x = pos[0]
-            pose.pose.orientation.y = pos[1]
-            pose.pose.orientation.z = pos[2] * self.z_sign
-            self.pose_pub.publish(pose)
-
-            # Publish fake GPS
-            lat, lon, alt = pm.enu2geodetic(pos[0], pos[1], pos[2],
-                                            self.lat_s, self.lon_s, self.alt_s)
-
-            nav = NavSatFix()
-
-            nav.header.stamp = self.get_clock().now().to_msg()
-            nav.header.frame_id = self.frame_id
-            nav.latitude = lat
-            nav.longitude = lon
-            nav.altitude = alt
-            self.fake_gps_pub.publish(nav)
-
-        except Exception as e:
-            self.get_logger().error(f'Error in spin_once: {e} traceback: {traceback.format_exc()}')
 
 def main(args=None):
     rclpy.init(args=args)
