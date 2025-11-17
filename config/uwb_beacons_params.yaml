@@ -1,8 +1,8 @@
 uwb_localizer_node:
   ros__parameters:
     # Serial communication parameters
-    port: "/dev/ttyUSB1"
-    baud: 460800
+    port: "/dev/ttyUSB0"
+    baud: 115200
     timeout: 1.0
 
     publication_frequency: 10.0 # Hz
@@ -27,6 +27,11 @@ uwb_localizer_node:
     # Anchor positions (x, y, z in meters)
     anchors_names: ["anchor.1", "anchor.2", "anchor.3", "anchor.4"]
     anchor.1: [0.0, 0.0, 0.0]
-    anchor.2: [3.0, 0.0, 0.0]
-    anchor.3: [0.0, 3.0, 0.0]
-    anchor.4: [3.0, 3.0, 0.0]
+    anchor.2: [4.0, 0.0, 0.0]
+    anchor.3: [0.0, 4.0, 0.0]
+    anchor.4: [4.0, 4.0, 0.0]
+
+    # GPS coordinate for zero position in local coordinates system
+    latitude: 55.760372
+    longitude: 48.758703
+    altitude: 0.0

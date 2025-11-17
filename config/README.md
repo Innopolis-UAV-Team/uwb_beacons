@@ -27,26 +27,6 @@ Edit this file to configure:
 - Frame ID and coordinate system
 - Performance settings
 
-### `example_room_setup.yaml`
-**Complete example** for a 4m × 4m room setup with 4 anchors.
-
-## Quick Setup
-
-1. Copy the example file:
-   ```bash
-   cp uwb_beacons_params_example.yaml uwb_beacons_params.yaml
-   ```
-
-2. Edit your configuration:
-   ```bash
-   nano uwb_beacons_params.yaml
-   ```
-
-3. Launch with your settings:
-   ```bash
-   ros2 launch uwb_beacons uwb_beacons.launch.py
-   ```
-
 # Parameters
 ### Serial Communication
 - `port`: Serial port device (default: `/dev/ttyUSB0`)
@@ -74,9 +54,15 @@ Edit this file to configure:
   - Cubic: `[a, b, c, d]` (default: `[0.0, 0.0, 1.0, 0.0]`)
 
 ### Anchor Positions
-- `anchors`: Dictionary of anchor positions in format `{anchor_id: [x, y, z]}`
+- `anchors`: Dictionary of anchor positions in format `{anchor.id: [x, y, z]}`
   - At least 3 anchors required for trilateration
   - Positions in meters relative to the frame_id origin
+
+### GPS Coordinate
+- `latitude`: Latitude in degrees (default: `0.0`)
+- `longitude`: Longitude in degrees (default: `0.0`)
+- `altitude`: Altitude in meters (default: `0.0`)
+- Those parameters are used to transform local coordinates to GPS coordinates
 
 ## Important Notes
 
