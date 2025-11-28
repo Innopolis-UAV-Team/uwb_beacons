@@ -61,6 +61,7 @@ class UWBLocalizer(Node):
         self.range_pub = self.create_publisher(Range, 'uwb/ranges', 10)
         self.debug_pub = self.create_publisher(String, 'uwb/debug', 10)
         self.fake_gps_pub = self.create_publisher(NavSatFix, 'uwb/gps', 10)
+        self.mocap_pub = self.create_publisher(PoseStamped, 'mavros/fake_gps/mocap/pose', 10)
 
         self.get_logger().info(f'Anchor positions: {self.anchor_positions}')
         self.get_logger().info(f'Calibration type: {self.calib_type}, params: {self.calib_params}')
@@ -97,7 +98,7 @@ class UWBLocalizer(Node):
                     self.last_msg_time[id] = 0.0
 
             if self.ser.in_waiting > 0:
-                response = self.ser.read_until(b'\xff\xff\xff\x00')
+                response = self.ser.read_all()
                 self.buffer.append(response)
 
                 while self.buffer.size > 0:
@@ -142,6 +143,19 @@ class UWBLocalizer(Node):
             pose.pose.orientation.y = pos[1]
             pose.pose.orientation.z = pos[2] * self.z_sign
             self.pose_pub.publish(pose)
+
+            pose1 = PoseStamped()
+            pose1.header.stamp = self.get_clock().now().to_msg()
+            pose1.header.frame_id = self.frame_id
+            pose1.pose.orientation.w = 1.0
+            pose1.pose.orientation.x = pos[0]
+            pose1.pose.orientation.y = pos[1]
+            pose1.pose.orientation.z = pos[2] * self.z_sign
+            pose1.pose.position.x = pos[0]
+            pose1.pose.position.y = pos[1]
+            pose1.pose.position.z = pos[2]
+            self.mocap_pub.publish(pose1)
+
 
             if not self.publish_gps:
                 return

@@ -2,10 +2,10 @@ uwb_localizer_node:
   ros__parameters:
     # Serial communication parameters
     port: "/dev/ttyS4"
-    baud: 115200
+    baud: 460800
     timeout: 1.0
 
-    publication_frequency: 10.0 # Hz
+    publication_frequency: 11.0 # Hz
 
     # Frame and coordinate system
     frame_id: "uwb_localizer"
@@ -25,14 +25,18 @@ uwb_localizer_node:
     calib_params: [1.0, 0.0]  # [a, b] for linear, [a, b, c] for quadratic, [a, b, c, d] for cubic
 
 
-    # Anchor positions (x, y, z in meters)
-    anchors_names: ["anchor.1", "anchor.2", "anchor.3", "anchor.4"]
-    anchor.1: [0.0, 0.0, 0.0]
-    anchor.2: [4.0, 0.0, 0.0]
-    anchor.3: [0.0, 4.0, 0.0]
-    anchor.4: [4.0, 4.0, 0.0]
+    # Anchor positions (x, y, z in meters in ENU)
+    anchors_names: ["anchor.2", "anchor.3", "anchor.5", "anchor.6", "anchor.7", "anchor.10", "anchor.11", "anchor.4"]
+    anchor.2: [2.41140231125805,	3.92476868022458,	0.819998338621701] # -0.1400016613783
+    anchor.3: [5.73561529226139, 18.4302694184006, 1.05597080447] # 0.175954840367108
+    anchor.5: [-17.4316871335299,	-3.33907984649149,	1.132975361] # 0.0429753612728663]
+    anchor.6: [-5.235279306434,  -1.20470579307984,  1.08399774324275] #-0.112041758710188]
+    anchor.7: [4.19626135565258,	-3.3613807956988,	0.920997738006921] #-0.209002261993079]
+    anchor.4:  [4.0, 0.0, 0.0]
+    anchor.10: [0.0, 4.0, 0.0]
+    anchor.11: [0.0, 0.0, 4.0]
 
     # GPS coordinate for zero position in local coordinates system
-    latitude: 55.760372
-    longitude: 48.758703
-    altitude: 0.0
+    latitude: 55.7601133
+    longitude: 48.7589121
+    altitude: 199.253
