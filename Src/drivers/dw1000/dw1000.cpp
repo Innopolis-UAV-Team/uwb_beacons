@@ -5,6 +5,7 @@
 */
 #include "dw1000.hpp"
 #include "common.hpp"
+#include <cstdio>
 
 /* Define the global dw1000 object */
 DW1000 dw1000;
@@ -34,10 +35,22 @@ uint8_t got_best_msg[12] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 0x00, 0x18
 uint32_t DW1000::status_reg = 0;
 uint8_t DW1000::frame_seq_nb = 0;
 uint8_t DW1000::rx_buffer[RX_BUF_LEN] = {};
+extern UART_HandleTypeDef huart1;
+extern SPI_HandleTypeDef hspi1;
 
 int8_t DW1000::read_message() {
+    uint32_t start_time = HAL_GetTick();
+    // Poll for reception of a frame or error/timeout.
+    if (HAL_SPI_GetState(&hspi1) != HAL_SPI_STATE_READY) {
+        return -1;
+    }
     while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) &
-                (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {}
+                (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {
+        if (HAL_GetTick() - start_time > 20) {
+            break;
+        }
+        HAL_Delay(1);
+    }
 
     if (!(status_reg & SYS_STATUS_RXFCG)) {
         /* Clear RX error/timeout events in the DW1000 status register. */
@@ -68,7 +81,7 @@ int DW1000::common_reset() {
         logger.log("INIT FAILED");
         return -1;
     }
-    logger.log("IN OK");
+    logger.log("IN OK\n");
     port_set_dw1000_fastrate();
 
     /* Configure DW1000. See NOTE 7 below. */
@@ -80,10 +93,18 @@ int DW1000::common_reset() {
     } else {
         if (((*antenna_delay) > 32872) & (min_error > 0)) {
             *antenna_delay = best_antenna_delay;
+            char buffer[50];
+            std::snprintf(buffer, sizeof(buffer), "BEST DLY:%d ERR:%.2f\n",
+                                                        static_cast<int>(best_antenna_delay),
+                                                        static_cast<float>(min_error));
+            logger.log(buffer);
+            // uint8_t data[50];
+            // memccpy(data, buffer, 0, strlen(buffer));
+            // HAL_UART_Transmit_IT(&huart1, data, strlen(buffer));
             is_calibration = false;
-            logger.log("CAL DONE");
         }
     }
+
     /* Apply default antenna delay value. See NOTE 1 below. */
     dwt_setrxantennadelay(*antenna_delay);
     dwt_settxantennadelay(*antenna_delay);
