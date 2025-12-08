@@ -13,8 +13,9 @@ extern IWDG_HandleTypeDef hiwdg;
 
 __attribute__((noreturn)) void application_entry_point() {
     logger.init();
+    dw1000.set_calibration(4, 6300);  // id, distance in mm
     if (dw1000.init() != 0) {
-        logger.log("INIT FAILED");
+        logger.log("INIT FAILED\n");
         while (true) {
             logger.spin();
             HAL_GPIO_TogglePin(GPIOA, LED1_Pin);
@@ -26,8 +27,12 @@ __attribute__((noreturn)) void application_entry_point() {
     while (true) {
         HAL_GPIO_TogglePin(GPIOA, LED2_Pin);
         logger.spin();
-        if (dw1000.spin() != 0) {
-            continue;
+        auto res = dw1000.spin();
+        if  (!dw1000.is_calibration) {
+            if (res != 0) {
+                HAL_GPIO_TogglePin(GPIOA, LED1_Pin);
+                continue;
+            }
         }
         HAL_IWDG_Refresh(&hiwdg);
     }

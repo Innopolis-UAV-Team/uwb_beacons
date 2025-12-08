@@ -5,11 +5,12 @@
 */
 
 #include <stdio.h>
-#include <Multilateration.h>
 #include "dw1000.hpp"
 #include "common.hpp"
 #include "../uart_logger/logger.hpp"
 #include <cstdio>
+#include <cstring>
+// #include <logs.h>
 
 
 /* Index to access some of the fields in the frames involved in the process. */
@@ -22,12 +23,12 @@
 /* Delay between frames, in UWB microseconds. See NOTE 4 below. */
 /* This is the delay from Frame RX timestamp to TX reply timestamp used for calculating/setting the DW1000's delayed TX function. This includes the
  * frame length of approximately 2.46 ms with above configuration. */
-#define POLL_RX_TO_RESP_TX_DLY_UUS 2750
+#define POLL_RX_TO_RESP_TX_DLY_UUS 3630
 /* This is the delay from the end of the frame transmission to
 the enable of the receiver, as programmed for the DW1000's wait for response feature. */
 #define RESP_TX_TO_FINAL_RX_DLY_UUS 500
 /* Receive final timeout. See NOTE 5 below. */
-#define FINAL_RX_TIMEOUT_UUS 3300
+#define FINAL_RX_TIMEOUT_UUS 5500
 
 
 /* Hold copies of computed time of flight and distance here for
@@ -46,6 +47,7 @@ static uint8_t tx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 0x00, 'W', ID, 0
 static uint8_t rx_final_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', ID, 'V', 0x00, 0x23, 0,
                                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
+extern UART_HandleTypeDef huart1;
 
 int DW1000::reset() {
     if (common_reset() != 0) return -1;
@@ -61,24 +63,38 @@ int8_t DW1000::spin() {
 
     /* Activate reception immediately. */
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
-
-    /* Poll for reception of a frame or error/timeout. */
-    while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) &
-            (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {}
-    if (!(status_reg & SYS_STATUS_RXFCG)) {
-        /* Clear RX error/timeout events in the DW1000 status register. */
-        dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
-        /* Reset RX to properly reinitialise LDE operation. */
-        dwt_rxreset();
-        return -1;
+    static double distance_sum = 0;
+    static uint16_t n_attempts = 0;
+    if (is_calibration) {
+        n_attempts++;
+        distance_sum += distance;
+        if (n_attempts > 20) {
+            auto mean_value_mm = distance_sum * 1000/ n_attempts;  // div by 1000 and mul by 1000
+            auto error = abs(mean_value_mm - real_distance);
+            if (min_error > error) {
+                min_error = error;
+                distance_sum = 0;
+                n_attempts = 0;
+                best_antenna_delay = *antenna_delay;
+                char buffer[50];
+                std::snprintf(buffer, sizeof(buffer), "DLY:%d ERR:%.2f\n", static_cast<int>(*antenna_delay),
+                                                            static_cast<float>(min_error));
+                HAL_UART_Transmit_IT(&huart1, static_cast<uint8_t*>(buffer), std::strlen(buffer));
+            }
+            *antenna_delay += 10;
+            reset();
+        }
     }
     bool got_poll = false;
     uint8_t n_tries = 0;
-    while((!got_poll) & (n_tries < 5)) {
+    while ((!got_poll) & (n_tries < 3)) {
+        n_tries++;
+
         if (read_message() != 0) {
+            /* Activate reception immediately. */
+            dwt_rxenable(DWT_START_RX_IMMEDIATE);
             continue;
         }
-        n_tries++;
 
         if (rx_buffer[MSG_TYPE_IND] != 0x21) {
             continue;
@@ -124,7 +140,8 @@ int8_t DW1000::spin() {
     /* If dwt_starttx() returns an error, abandon this ranging exchange
     and proceed to the next one. See NOTE 11 below. */
     if (ret == DWT_ERROR) {
-        logs("F\n");
+        HAL_UART_Transmit_IT(&huart1, static_cast<uint8_t *>("E\n"), 2);
+        // logs("F\n");
         return -1;
     }
 
@@ -134,8 +151,10 @@ int8_t DW1000::spin() {
     /* Try to read the final message 10 times */
     n_tries = 0;
     bool got_final = false;
-    while ((!got_final) & (n_tries < 5)) {
+    while ((!got_final) & (n_tries < 3)) {
         if (read_message() != 0) {
+            /* Activate reception immediately. */
+            dwt_rxenable(DWT_START_RX_IMMEDIATE);
             continue;
         }
         n_tries++;
@@ -167,22 +186,23 @@ int8_t DW1000::spin() {
     final_msg_get_ts(&rx_buffer[FINAL_MSG_FINAL_TX_TS_IDX], &final_tx_ts);
 
     /* Compute time of flight. 32-bit subtractions give correct answers even if clock has wrapped. See NOTE 12 below. */
-    poll_rx_ts_32 = (uint32_t)poll_rx_ts;
-    resp_tx_ts_32 = (uint32_t)resp_tx_ts;
-    final_rx_ts_32 = (uint32_t)final_rx_ts;
-    Ra = (double)(resp_rx_ts - poll_tx_ts);
-    Rb = (double)(final_rx_ts_32 - resp_tx_ts_32);
-    Da = (double)(final_tx_ts - resp_rx_ts);
-    Db = (double)(resp_tx_ts_32 - poll_rx_ts_32);
-    tof_dtu = (int64)((Ra * Rb - Da * Db) / (Ra + Rb + Da + Db));
+    poll_rx_ts_32 = static_cast<uint32_t>(poll_rx_ts);
+    resp_tx_ts_32 = static_cast<uint32_t>(resp_tx_ts);
+    final_rx_ts_32 = static_cast<uint32_t>(final_rx_ts);
+    Ra = static_cast<double>(resp_rx_ts - poll_tx_ts);
+    Rb = static_cast<double>(final_rx_ts_32 - resp_tx_ts_32);
+    Da = static_cast<double>(resp_tx_ts_32 - poll_rx_ts_32);
+    Db = static_cast<double>(final_tx_ts - resp_rx_ts);
+    tof_dtu = static_cast<int64>((Ra * Rb - Da * Db) / (Ra + Rb + Da + Db));
     tof = tof_dtu * DWT_TIME_UNITS;
     distance = tof * SPEED_OF_LIGHT;
+
     if (distance < 0) {
         return -1;
     }
 
     /* Display computed distance on LCD. */
-    uint32_t dist = uint32_t(int(distance * 1000));
+    uint32_t dist = static_cast<uint32_t>(distance * 1000);
     log_data[0] = anchor_id;
     log_data[1] =  dist & 0xFF;
     log_data[2] = (dist >> 8) & 0xFF;
@@ -192,6 +212,6 @@ int8_t DW1000::spin() {
     log_data[6] = 0xFF;
     log_data[7] = 0xFF;
     log_data[8] = 0;
-    logc(log_data, 9);
+    HAL_UART_Transmit_IT(&huart1, log_data, 9);
     return 0;
 }

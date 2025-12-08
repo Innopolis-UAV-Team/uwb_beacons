@@ -14,6 +14,7 @@
 #include "stm32f103xb.h"
 #include "../uart_logger/logger.hpp"
 #include "port.h"
+#include "common.hpp"
 
 #ifdef ANCHOR
 #define APP_NAME "Anchor V1.0"
@@ -37,6 +38,8 @@ class DW1000 {
         return reset();
     }
     int8_t spin();
+    void set_calibration(int id, uint16_t real_distance_mm);
+    bool is_calibration;
 
  private:
     int common_reset();
@@ -50,6 +53,15 @@ class DW1000 {
     static uint8_t frame_seq_nb;
     static void rx_ok_cb(const dwt_cb_data_t *cb_data);
     static void rx_err_cb(const dwt_cb_data_t *cb_data);
+
+    /* Data for calibration */
+    uint16_t real_distance;
+    uint16_t seeked_id = 0;
+    double min_error = MAXFLOAT;
+    uint32_t best_antenna_delay;
+    antenna_delay_t antenna_delays = {TX_ANT_DLY, TX_ANT_DLY};
+    uint16_t* antenna_delay = nullptr;
+    void get_current_ant_delay();
 };
 
 extern DW1000 dw1000;
