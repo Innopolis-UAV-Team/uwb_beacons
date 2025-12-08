@@ -10,7 +10,7 @@
 #include "../uart_logger/logger.hpp"
 #include <cstdio>
 #include <cstring>
-// #include <logs.h>
+#include <logs.h>
 
 
 /* Index to access some of the fields in the frames involved in the process. */
@@ -48,6 +48,7 @@ static uint8_t rx_final_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', ID, 'V', 0x00, 
                                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 extern UART_HandleTypeDef huart1;
+uint8_t data[50] = {0};
 
 int DW1000::reset() {
     if (common_reset() != 0) return -1;
@@ -58,33 +59,36 @@ int DW1000::reset() {
 }
 
 int8_t DW1000::spin() {
-    /* Clear reception timeout to start next ranging process. */
-    dwt_setrxtimeout(0);
-
-    /* Activate reception immediately. */
-    dwt_rxenable(DWT_START_RX_IMMEDIATE);
     static double distance_sum = 0;
     static uint16_t n_attempts = 0;
     if (is_calibration) {
         n_attempts++;
         distance_sum += distance;
-        if (n_attempts > 20) {
+        if (n_attempts > 1000) {
             auto mean_value_mm = distance_sum * 1000/ n_attempts;  // div by 1000 and mul by 1000
             auto error = abs(mean_value_mm - real_distance);
+            n_attempts = 0;
+
             if (min_error > error) {
                 min_error = error;
                 distance_sum = 0;
-                n_attempts = 0;
                 best_antenna_delay = *antenna_delay;
-                char buffer[50];
-                std::snprintf(buffer, sizeof(buffer), "DLY:%d ERR:%.2f\n", static_cast<int>(*antenna_delay),
-                                                            static_cast<float>(min_error));
-                HAL_UART_Transmit_IT(&huart1, static_cast<uint8_t*>(buffer), std::strlen(buffer));
+                char buffer[UART_MAX_MESSAGE_LEN];
+                std::snprintf(buffer, sizeof(buffer), "DLY:%d ERR:%d\n",
+                                                            static_cast<int>(*antenna_delay),
+                                                            static_cast<int>(min_error));
+                logger.log(buffer);
             }
             *antenna_delay += 10;
             reset();
         }
     }
+    /* Clear reception timeout to start next ranging process. */
+    dwt_setrxtimeout(0);
+
+    /* Activate reception immediately. */
+    dwt_rxenable(DWT_START_RX_IMMEDIATE);
+
     bool got_poll = false;
     uint8_t n_tries = 0;
     while ((!got_poll) & (n_tries < 3)) {
@@ -140,8 +144,7 @@ int8_t DW1000::spin() {
     /* If dwt_starttx() returns an error, abandon this ranging exchange
     and proceed to the next one. See NOTE 11 below. */
     if (ret == DWT_ERROR) {
-        HAL_UART_Transmit_IT(&huart1, static_cast<uint8_t *>("E\n"), 2);
-        // logs("F\n");
+        logger.log("TX ERR\n");
         return -1;
     }
 

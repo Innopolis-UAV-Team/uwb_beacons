@@ -19,7 +19,7 @@
 #ifdef ANCHOR
 #define APP_NAME "Anchor V1.0"
 #else
-#define APP_NAME "Rover V1.0"
+#define APP_NAME "Rover V2.0"
 #endif
 
 /* Buffer to store received messages.

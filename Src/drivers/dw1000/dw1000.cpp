@@ -81,7 +81,7 @@ int DW1000::common_reset() {
         logger.log("INIT FAILED");
         return -1;
     }
-    logger.log("IN OK\n");
+    // logger.log("RESET\n");
     port_set_dw1000_fastrate();
 
     /* Configure DW1000. See NOTE 7 below. */
@@ -91,18 +91,18 @@ int DW1000::common_reset() {
     if (!is_calibration) {
         *antenna_delay = TX_ANT_DLY;
     } else {
+        char buffer[50];
+
         if (((*antenna_delay) > 32872) & (min_error > 0)) {
             *antenna_delay = best_antenna_delay;
-            char buffer[50];
-            std::snprintf(buffer, sizeof(buffer), "BEST DLY:%d ERR:%.2f\n",
+            snprintf(buffer, sizeof(buffer), "BEST DLY:%d ERR:%d\n",
                                                         static_cast<int>(best_antenna_delay),
-                                                        static_cast<float>(min_error));
+                                                        static_cast<int>(min_error));
             logger.log(buffer);
-            // uint8_t data[50];
-            // memccpy(data, buffer, 0, strlen(buffer));
-            // HAL_UART_Transmit_IT(&huart1, data, strlen(buffer));
             is_calibration = false;
         }
+        snprintf(buffer, sizeof(buffer), "CAL DLY:%d\n", static_cast<int>(*antenna_delay));
+        logger.log(buffer);
     }
 
     /* Apply default antenna delay value. See NOTE 1 below. */
