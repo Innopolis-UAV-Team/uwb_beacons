@@ -8,12 +8,8 @@
 #include <string.h>
 
 extern UART_HandleTypeDef huart1;
-
-struct UART_Message {
-    uint8_t* data;
-    uint8_t len;
-};
 MessagesCircularBuffer buffer = {0};
+uint8_t uart_tx_busy = 0;
 
 void push_message(UART_Message message) {
     memcpy(&buffer.messages[buffer.next_id], &message, sizeof(UART_Message));
@@ -51,22 +47,28 @@ void usart_init() {
 }
 
 void usart_send(uint8_t *data, uint16_t len) {
-    push_message((UART_Message){.data = data, .len = len});
+    UART_Message message = {.len = len};
+    memcpy(message.data, data, len);
+    push_message(message);
 }
 
 void usart_run() {
-    if (buffer.size == 0) {
+    if ((buffer.size == 0) || uart_tx_busy) {
         return;
     }
     UART_Message message;
     pop_last_message(&message);
-
+    uart_tx_busy = 1;
     HAL_StatusTypeDef res = HAL_UART_Transmit_IT(&huart1, message.data, message.len);
     if (res != HAL_OK) {
         HAL_GPIO_TogglePin(GPIOA, LED1_Pin);
         HAL_GPIO_WritePin(GPIOA, LED2_Pin, GPIO_PIN_RESET);
         return;
     }
+}
 
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
+    (void)huart;
+    uart_tx_busy = 0;
     HAL_GPIO_TogglePin(GPIOA, LED2_Pin);
 }

@@ -14,10 +14,11 @@
 extern "C" {
 #endif
 
-#define UART_MAX_QUEUE_SIZE 40
+#define UART_MAX_QUEUE_SIZE 15
+#define UART_MAX_MESSAGE_LEN 40
 
 typedef struct {
-    uint8_t* data;
+    uint8_t data[UART_MAX_MESSAGE_LEN];
     uint8_t len;
 } UART_Message;
 

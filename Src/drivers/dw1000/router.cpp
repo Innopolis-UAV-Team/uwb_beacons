@@ -62,9 +62,14 @@ int8_t DW1000::spin() {
     static double distance_sum = 0;
     static uint16_t n_attempts = 0;
     if (is_calibration) {
+        char buffer[UART_MAX_MESSAGE_LEN];
         n_attempts++;
         distance_sum += distance;
-        if (n_attempts > 1000) {
+        if (n_attempts % 10 == 0) {
+            snprintf(buffer, sizeof(buffer), "num: %d", n_attempts);
+            logger.log(buffer);
+        }
+        if (n_attempts >= 100) {
             auto mean_value_mm = distance_sum * 1000/ n_attempts;  // div by 1000 and mul by 1000
             auto error = abs(mean_value_mm - real_distance);
             n_attempts = 0;
@@ -73,12 +78,14 @@ int8_t DW1000::spin() {
                 min_error = error;
                 distance_sum = 0;
                 best_antenna_delay = *antenna_delay;
-                char buffer[UART_MAX_MESSAGE_LEN];
                 std::snprintf(buffer, sizeof(buffer), "DLY:%d ERR:%d\n",
                                                             static_cast<int>(*antenna_delay),
                                                             static_cast<int>(min_error));
                 logger.log(buffer);
             }
+            snprintf(buffer, sizeof(buffer), "CAL DLY: %d\n",
+                                                static_cast<int>(*antenna_delay));
+            logger.log(buffer);
             *antenna_delay += 10;
             reset();
         }
@@ -215,6 +222,6 @@ int8_t DW1000::spin() {
     log_data[6] = 0xFF;
     log_data[7] = 0xFF;
     log_data[8] = 0;
-    HAL_UART_Transmit_IT(&huart1, log_data, 9);
+    logger.log(log_data, 9);
     return 0;
 }
