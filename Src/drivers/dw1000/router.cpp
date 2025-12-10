@@ -23,12 +23,12 @@
 /* Delay between frames, in UWB microseconds. See NOTE 4 below. */
 /* This is the delay from Frame RX timestamp to TX reply timestamp used for calculating/setting the DW1000's delayed TX function. This includes the
  * frame length of approximately 2.46 ms with above configuration. */
-#define POLL_RX_TO_RESP_TX_DLY_UUS 3630
+#define POLL_RX_TO_RESP_TX_DLY_UUS 5000
 /* This is the delay from the end of the frame transmission to
 the enable of the receiver, as programmed for the DW1000's wait for response feature. */
 #define RESP_TX_TO_FINAL_RX_DLY_UUS 500
 /* Receive final timeout. See NOTE 5 below. */
-#define FINAL_RX_TIMEOUT_UUS 5500
+#define FINAL_RX_TIMEOUT_UUS 3000 // , , 3500, 4000, 4500, 5000, 5500, 6000, 7000 does not work
 
 
 /* Hold copies of computed time of flight and distance here for
@@ -59,37 +59,42 @@ int DW1000::reset() {
 }
 
 int8_t DW1000::spin() {
+    static uint8_t anchor_id;
     static double distance_sum = 0;
     static uint16_t n_attempts = 0;
-    if (is_calibration) {
+    static uint16_t success_attempts = 0;
+    if (is_calibration && (anchor_id == seeked_id)) {
         char buffer[UART_MAX_MESSAGE_LEN];
         n_attempts++;
         distance_sum += distance;
-        if (n_attempts % 10 == 0) {
-            snprintf(buffer, sizeof(buffer), "num: %d", n_attempts);
-            logger.log(buffer);
+        if (abs(distance) >= 0.01f) {
+            success_attempts++;
         }
-        if (n_attempts >= 100) {
-            auto mean_value_mm = distance_sum * 1000/ n_attempts;  // div by 1000 and mul by 1000
-            auto error = abs(mean_value_mm - real_distance);
-            n_attempts = 0;
 
-            if (min_error > error) {
-                min_error = error;
-                distance_sum = 0;
-                best_antenna_delay = *antenna_delay;
-                std::snprintf(buffer, sizeof(buffer), "DLY:%d ERR:%d\n",
-                                                            static_cast<int>(*antenna_delay),
-                                                            static_cast<int>(min_error));
-                logger.log(buffer);
-            }
+        if (n_attempts > 100) {
             snprintf(buffer, sizeof(buffer), "CAL DLY: %d\n",
-                                                static_cast<int>(*antenna_delay));
-            logger.log(buffer);
+            static_cast<int>(*antenna_delay));
             *antenna_delay += 10;
+            success_attempts = 0;
+            n_attempts = 0;
             reset();
+            if (success_attempts >= 10) {
+                auto mean_value_mm = distance_sum * 1000/ success_attempts;
+                auto error = abs(mean_value_mm - real_distance);
+
+                if (min_error > error) {
+                    min_error = error;
+                    distance_sum = 0;
+                    best_antenna_delay = *antenna_delay;
+                    std::snprintf(buffer, sizeof(buffer), "DLY:%d ERR:%d\n",
+                                                                static_cast<int>(*antenna_delay),
+                                                                static_cast<int>(min_error));
+                }
+            }
+            logger.log(buffer);
         }
     }
+    distance = 0;
     /* Clear reception timeout to start next ranging process. */
     dwt_setrxtimeout(0);
 
@@ -121,13 +126,14 @@ int8_t DW1000::spin() {
 
     /* Check that the frame is a poll sent by which anchor.
         * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
-    uint8_t anchor_id = rx_buffer[SOURCE_ID_IND];
+    anchor_id = rx_buffer[SOURCE_ID_IND];
     rx_poll_msg[SOURCE_ID_IND] = anchor_id;
     tx_resp_msg[DEST_ID_IND] = anchor_id;
     rx_final_msg[SOURCE_ID_IND] = anchor_id;
     if (memcmp(rx_buffer, rx_poll_msg, ALL_MSG_COMMON_LEN) != 0) {
         return -1;
     }
+    memset(&rx_buffer, 0, sizeof(rx_buffer));
     uint32_t resp_tx_time;
     int ret;
 
@@ -151,7 +157,6 @@ int8_t DW1000::spin() {
     /* If dwt_starttx() returns an error, abandon this ranging exchange
     and proceed to the next one. See NOTE 11 below. */
     if (ret == DWT_ERROR) {
-        logger.log("TX ERR\n");
         return -1;
     }
 
@@ -161,13 +166,15 @@ int8_t DW1000::spin() {
     /* Try to read the final message 10 times */
     n_tries = 0;
     bool got_final = false;
-    while ((!got_final) & (n_tries < 3)) {
+    status_reg = dwt_read32bitreg(SYS_STATUS_ID);
+
+    while ((!got_final) & (n_tries < 5)) {
+        n_tries++;
         if (read_message() != 0) {
             /* Activate reception immediately. */
             dwt_rxenable(DWT_START_RX_IMMEDIATE);
             continue;
         }
-        n_tries++;
         if (rx_buffer[MSG_TYPE_IND] != 0x23) {
             continue;
         }
@@ -225,3 +232,14 @@ int8_t DW1000::spin() {
     logger.log(log_data, 9);
     return 0;
 }
+
+/**
+ * NOTES:
+ * 
+ * 9. Timestamps and delayed transmission time are both expressed in device time units so
+ *    we just have to add the desired response delay to poll RX timestamp to get response
+ *    transmission time. The delayed transmission time resolution is 512 device time units
+ *    which means that the lower 9 bits of the obtained value must be zeroed.
+ *    This also allows to encode the 40-bit value in a 32-bit words by shifting the all-zero
+ *    lower 8 bits.
+ */
