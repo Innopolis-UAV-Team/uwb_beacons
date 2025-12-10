@@ -21,15 +21,8 @@ dwt_config_t dw_config = {
     1,               /* 0 to use standard SFD, 1 to use non-standard SFD. */
     DWT_BR_110K,     /* Data rate. */
     DWT_PHRMODE_STD, /* PHY header mode. */
-    // 4096+64
     (2048 + 1 + 64 - 64) /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
 };
-
-uint8_t poll_msg[12] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 0x00, 0x21, 0, 0};
-uint8_t resp_msg[15] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 0x00, 'W', 'A', 0x10, 0x02, 0, 0, 0, 0};
-uint8_t final_msg[24] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 0x00, 0x23, 0, 0,
-                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-uint8_t got_best_msg[12] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 0x00, 0x18, 0, 0};
 
 /* Static member definitions */
 uint32_t DW1000::status_reg = 0;
@@ -65,7 +58,7 @@ int8_t DW1000::read_message() {
 
     /* A frame has been received, read it into the local buffer. */
     uint32_t frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFL_MASK_1023;
-    if (frame_len <= RX_BUFFER_LEN) {
+    if (frame_len <= sizeof(rx_buffer)) {
         dwt_readrxdata(rx_buffer, frame_len, 0);
         return 0;
     }
@@ -112,13 +105,13 @@ int DW1000::common_reset() {
 }
 
 /**
- * Estimate the transmission time of a frame in seconds
+ * Estimate the transmission time of a frame in uus
  * Author: tomlankhorst 2016 https://tomlankhorst.nl/estimating-decawave-dw1000-tx-time/
  * dwt_config_t   dwt_config  Configuration struct of the DW1000
  * uint16_t       framelength Framelength including the 2-Byte CRC
  * bool           only_rmarker Option to compute only the time to the RMARKER (SHR time)
  */
-float dwt_estimate_tx_time(dwt_config_t dwt_config, uint16_t framelength, bool only_rmarker) {
+int DW1000::dwt_estimate_tx_time(uint16_t framelength, bool only_rmarker) {
     int32_t tx_time;
     size_t sym_timing_ind;
     uint16_t shr_len;
@@ -136,39 +129,39 @@ float dwt_estimate_tx_time(dwt_config_t dwt_config, uint16_t framelength, bool o
     const size_t SYM_TIM_PHR   = 1;
     const size_t SYM_TIM_DAT   = 2;
 
-    const static uint16_t SYM_TIM_LUT[] = {
+    static const uint16_t SYM_TIM_LUT[] = {
         // 16 Mhz PRF
-        994, 8206, 8206,  // 0.11 Mbps
-        994, 1026, 1026,  // 0.85 Mbps
-        994, 1026, 129,   // 6.81 Mbps
+        994, 8206, 8206,   // 0.11 Mbps
+        994, 1026, 1026,   // 0.85 Mbps
+        994, 1026, 129,    // 6.81 Mbps
         // 64 Mhz PRF
-        1018, 8206, 8206, // 0.11 Mbps
-        1018, 1026, 1026, // 0.85 Mbps
-        1018, 1026, 129   // 6.81 Mbps
+        1018, 8206, 8206,  // 0.11 Mbps
+        1018, 1026, 1026,  // 0.85 Mbps
+        1018, 1026, 129    // 6.81 Mbps
     };
 
     // Find the PHR
-    switch( dwt_config.prf ) {
+    switch (dw_config.prf) {
         case DWT_PRF_16M:  sym_timing_ind = SYM_TIM_16MHZ; break;
         case DWT_PRF_64M:  sym_timing_ind = SYM_TIM_64MHZ; break;
-        default: return -1.0f; // Invalid PRF
+        default: return -1.0f;  // Invalid PRF
     }
 
     // Find the preamble length
-    switch( dwt_config.txPreambLength ) {
-        case DWT_PLEN_64:    shr_len = 64;    break;
-        case DWT_PLEN_128:  shr_len = 128;  break;
-        case DWT_PLEN_256:  shr_len = 256;  break;
-        case DWT_PLEN_512:  shr_len = 512;  break;
+    switch (dw_config.txPreambLength) {
+        case DWT_PLEN_64:   shr_len = 64;    break;
+        case DWT_PLEN_128:  shr_len = 128;   break;
+        case DWT_PLEN_256:  shr_len = 256;   break;
+        case DWT_PLEN_512:  shr_len = 512;   break;
         case DWT_PLEN_1024: shr_len = 1024;  break;
         case DWT_PLEN_1536: shr_len = 1536;  break;
         case DWT_PLEN_2048: shr_len = 2048;  break;
         case DWT_PLEN_4096: shr_len = 4096;  break;
-        default: return -1.0f; // Invalid preamble length
+        default: return -1.0f;  // Invalid preamble length
     }
 
     // Find the datarate
-    switch( dwt_config.dataRate ) {
+    switch (dw_config.dataRate) {
         case DWT_BR_110K:
             sym_timing_ind  += SYM_TIM_110K;
             shr_len         += 64;  // SFD 64 symbols
@@ -203,7 +196,7 @@ float dwt_estimate_tx_time(dwt_config_t dwt_config, uint16_t framelength, bool o
     }
 
     // Return float seconds
-    return (1.0e-9f) * tx_time;
+    return seconds_to_dwt_s(tx_time);
 }
 
 void DW1000::get_current_ant_delay() {
@@ -307,6 +300,5 @@ void DW1000::set_calibration(int id, uint16_t real_distance_mm) {
     is_calibration = true;
     get_current_ant_delay();
     *antenna_delay = 10000;
-    // antenna_delays = 1000;
     min_error = MAXFLOAT;
 }
