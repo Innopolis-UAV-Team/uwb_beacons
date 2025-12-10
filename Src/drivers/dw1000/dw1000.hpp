@@ -26,8 +26,15 @@
  * Its size is adjusted to longest frame that this example code is supposed to handle. */
 #define RX_BUF_LEN 24
 
+enum ModuleState: uint8_t {
+    MODULE_IDLE = 0,
+    MODULE_OPERATIONAL,
+    MODULE_ERROR,
+};
+
 class DW1000 {
  public:
+    ModuleState state;
     int init() {
         setup_DW1000RSTnIRQ(1);
         /* Display application name on LCD. */
@@ -35,11 +42,18 @@ class DW1000 {
         /* Reset and initialise DW1000.
          * For initialisation, DW1000 clocks must be temporarily set to crystal speed. After initialisation SPI rate can be increased for optimum
          * performance. */
-        return reset();
+        if (reset() != 0) {
+            state = ModuleState::MODULE_ERROR;
+            return -1;
+        }
+        initialized = true;
+        state = ModuleState::MODULE_OPERATIONAL;
+        return 0;
     }
     int8_t spin();
     void set_calibration(int id, uint16_t real_distance_mm);
     bool is_calibration;
+    int dwt_estimate_tx_time(uint16_t framelength, bool only_rmarker = false);
 
  private:
     int common_reset();
@@ -62,6 +76,8 @@ class DW1000 {
     antenna_delay_t antenna_delays = {TX_ANT_DLY, TX_ANT_DLY};
     uint16_t* antenna_delay = nullptr;
     void get_current_ant_delay();
+    float seconds_to_dwt_s(float s) { return s * 512/499.2; }
+    bool initialized = false;
 };
 
 extern DW1000 dw1000;
