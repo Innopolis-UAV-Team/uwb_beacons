@@ -10,7 +10,7 @@ class Message:
 
 def decode(data: bytes) -> int:
     # first byte is id
-    msgs = data.split(b'\xFF\xFF\xFF\x00')
+    msgs = data.split(b'\xFF\xFF\xFF\x55')
     i = 0
     for d in msgs:
         print(Message(d))
@@ -27,7 +27,7 @@ class CircularBuffer:
     def append(self, item: bytes | None):
         if item is None:
             return
-        items = item.split(b'\xff\xff\xff\x00')
+        items = item.split(b'\xff\xff\xff\x55')
         for item in items:
             if len(item) == 0:
                 continue

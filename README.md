@@ -30,7 +30,7 @@ The format is:
 ```
 | uint8_t | uint32_t | uint32_t |
 | ------- | -------- | -------- |
-| TAG ID  | DISTANCE | 0xFFFFFF00 - message end |
+| TAG ID  | DISTANCE | 0xFFFFFF55 - message end |
 ```
 
 Example:
@@ -39,7 +39,7 @@ Example:
 real distance: 100 mm
 1,100,0xFF00
 in hex:
-0x1, 0x00, 0x00 0x00 0x64, 0xFF, 0xFF, 0xFF, 0x00
+0x1, 0x00, 0x00 0x00 0x64, 0xFF, 0xFF, 0xFF, 0x55
 ```
 
 # Data parsing
