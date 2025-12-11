@@ -67,12 +67,12 @@ void usart_run() {
         uart_tx_busy--;
         return;
     }
+    memset(&buffer.messages[last_id], 0, sizeof(UART_Message));
     HAL_GPIO_WritePin(GPIOA, LED1_Pin, GPIO_PIN_RESET);
 }
 
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
     (void)huart;
-    memset(&buffer.messages[last_id], 0, sizeof(UART_Message));
     uart_tx_busy--;
     HAL_GPIO_TogglePin(GPIOA, LED2_Pin);
 }
