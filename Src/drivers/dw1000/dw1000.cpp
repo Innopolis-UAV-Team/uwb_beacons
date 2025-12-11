@@ -80,6 +80,7 @@ int DW1000::common_reset() {
     /* Configure DW1000. See NOTE 7 below. */
     dwt_configure(&dw_config);
     dwt_configurefor64plen(dw_config.prf);
+    dwt_setleds(DWT_LEDS_RXTXOK | DWT_LEDS_SFD);
 
     if (!is_calibration) {
         *antenna_delay = TX_ANT_DLY;

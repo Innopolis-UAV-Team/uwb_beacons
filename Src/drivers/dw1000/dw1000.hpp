@@ -78,6 +78,31 @@ class DW1000 {
     void get_current_ant_delay();
     float seconds_to_dwt_s(float s) { return s * 512/499.2; }
     bool initialized = false;
+    uint32_t last_success_time = 0;
+
+    void update_status(ModuleState prop_state) {
+        if (!initialized) {
+            state = MODULE_ERROR;
+            return;
+        }
+        switch (prop_state) {
+            case ModuleState::MODULE_OPERATIONAL:
+                last_success_time = HAL_GetTick();
+                state = prop_state;
+                break;
+            case ModuleState::MODULE_ERROR:
+                if (HAL_GetTick() - last_success_time > 1000) {
+                    state = prop_state;
+                }
+                break;
+            case ModuleState::MODULE_IDLE:
+                if (state != MODULE_ERROR)
+                    state = prop_state;
+                break;
+            default:
+                break;
+        }
+    }
 };
 
 extern DW1000 dw1000;

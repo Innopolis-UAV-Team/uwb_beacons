@@ -119,6 +119,7 @@ int8_t DW1000::spin() {
     }
 
     if (!got_poll) {
+        update_status(ModuleState::MODULE_IDLE);
         return -1;
     }
 
@@ -157,6 +158,7 @@ int8_t DW1000::spin() {
     /* If dwt_starttx() returns an error, abandon this ranging exchange
     and proceed to the next one. See NOTE 11 below. */
     if (ret == DWT_ERROR) {
+        update_status(ModuleState::MODULE_ERROR);
         return -1;
     }
 
@@ -185,6 +187,7 @@ int8_t DW1000::spin() {
     }
 
     if (!got_final) {
+        update_status(ModuleState::MODULE_ERROR);
         return -1;
     }
 
@@ -215,6 +218,7 @@ int8_t DW1000::spin() {
     distance = tof * SPEED_OF_LIGHT;
 
     if (distance < 0) {
+        update_status(ModuleState::MODULE_IDLE);
         return -1;
     }
 
@@ -230,6 +234,9 @@ int8_t DW1000::spin() {
     log_data[7] = 0xFF;
     log_data[8] = 0;
     logger.log(log_data, 9);
+    last_success_time = HAL_GetTick();
+    update_status(ModuleState::MODULE_OPERATIONAL);
+
     return 0;
 }
 

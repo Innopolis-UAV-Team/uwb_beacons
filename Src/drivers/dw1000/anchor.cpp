@@ -14,7 +14,7 @@ the enable of the receiver, as programmed for the DW1000's wait for response fea
 #define POLL_TX_TO_RESP_RX_DLY_UUS 100
 /* This is the delay from Frame RX timestamp to TX reply timestamp used for calculating/setting the DW1000's delayed TX function. This includes the
  * frame length of approximately 2.66 ms with above configuration. */
-#define RESP_RX_TO_FINAL_TX_DLY_UUS 3780
+#define RESP_RX_TO_FINAL_TX_DLY_UUS 4000
 /* Receive response timeout. */
 #define RESP_RX_TIMEOUT_UUS 3750
 
@@ -42,16 +42,12 @@ int DW1000::reset() {
 }
 
 int8_t DW1000::spin() {
-    // /* Poll DW1000 until TX frame sent event set.*/
-    // TODO(asiiapine): delete this
-    // while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS))
-    // { };
-
     /* Clear TXFRS event. */
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
 
     static uint32_t last_transition_ms = 0;
     if (HAL_GetTick() - last_transition_ms < RNG_DELAY_MS) {
+        update_status(ModuleState::MODULE_IDLE);
         return 0;
     }
     last_transition_ms = HAL_GetTick();
@@ -67,6 +63,7 @@ int8_t DW1000::spin() {
         * set by dwt_setrxaftertxdelay() has elapsed. */
     int res = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
     if (res != 0) {
+        update_status(ModuleState::MODULE_ERROR);
         return res;
     }
 
@@ -75,11 +72,14 @@ int8_t DW1000::spin() {
 
     uint8_t n_tries = 0;
     bool got_response = false;
-    while ((!got_response) & (n_tries < 2)) {
+    while ((!got_response) & (n_tries < 3)) {
+        n_tries++;
+
         if (read_message() != 0) {
+            /* Activate reception immediately. */
+            dwt_rxenable(DWT_START_RX_IMMEDIATE);
             continue;
         }
-        n_tries++;
         rx_buffer[ALL_MSG_SN_IDX] = 0;
         uint8_t id = rx_buffer[SOURCE_ID_IND];
         rx_resp_msg[SOURCE_ID_IND] = id;
@@ -93,6 +93,7 @@ int8_t DW1000::spin() {
         got_response = true;
     }
     if (!got_response) {
+        update_status(ModuleState::MODULE_ERROR);
         return -1;
     }
 
@@ -121,15 +122,17 @@ int8_t DW1000::spin() {
     dwt_writetxdata(sizeof(tx_final_msg), tx_final_msg, 0); /* Zero offset in TX buffer. */
     dwt_writetxfctrl(sizeof(tx_final_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
     ret = dwt_starttx(DWT_START_TX_DELAYED);
-
+    status_reg = dwt_read32bitreg(SYS_STATUS_ID);
     /* If dwt_starttx() returns an error, abandon this ranging exchange and proceed
     to the next one.*/
     if (ret != DWT_SUCCESS) {
+        update_status(ModuleState::MODULE_ERROR);
         return -1;
     }
 
     /* Increment frame sequence number after transmission of the final message (modulo 256). */
     frame_seq_nb++;
     /* Execute a delay between ranging exchanges. */
+    update_status(ModuleState::MODULE_OPERATIONAL);
     return 0;
 }
