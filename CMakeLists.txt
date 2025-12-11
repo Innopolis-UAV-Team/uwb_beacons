@@ -30,6 +30,8 @@ else()
     add_definitions(-DROUTER)
 endif()
 
+add_definitions(-DCALIBRATE=${CALIBRATE})
+
 if(NOT DEFINED BAUDRATE)
     set(BAUDRATE "230400")  # default value
 endif()
