@@ -3,9 +3,9 @@
  * See <https://www.gnu.org/licenses/> for details.
  * Author: Anastasiia Stepanova <asiiapine@gmail.com>
 */
+#include <cstdio>
 #include "dw1000.hpp"
 #include "common.hpp"
-#include <cstdio>
 
 /* Define the global dw1000 object */
 DW1000 dw1000;
@@ -87,7 +87,7 @@ int DW1000::common_reset() {
     } else {
         char buffer[50];
 
-        if (((*antenna_delay) > 32872) & (min_error > 0)) {
+        if (((*antenna_delay) > 17000) & (min_error > 0)) {
             *antenna_delay = best_antenna_delay;
             snprintf(buffer, sizeof(buffer), "BEST DLY:%d ERR:%d\n",
                                                         static_cast<int>(best_antenna_delay),
@@ -104,6 +104,66 @@ int DW1000::common_reset() {
     dwt_settxantennadelay(*antenna_delay);
     return 0;
 }
+
+void DW1000::set_calibration(int id, uint16_t real_distance_mm) {
+    seeked_id = id;
+    real_distance = real_distance_mm;
+    is_calibration = true;
+    get_current_ant_delay();
+    *antenna_delay = TX_ANT_DLY - 100;
+    min_error = MAXFLOAT;
+}
+
+void DW1000::calibrate(uint8_t anchor_id, float distance_mm) {
+    static double distance_sum = 0;
+    static uint16_t n_attempts = 0;
+    static uint16_t success_attempts = 0;
+    int add = 10;
+    if (anchor_id != seeked_id) {
+        return;
+    }
+    char buffer[UART_MAX_MESSAGE_LEN] = {0};
+    n_attempts++;
+    distance_sum += distance_mm;
+    if (abs(distance_mm) >= 0.01f) {
+        success_attempts++;
+    }
+
+    if (n_attempts < 1000) return;
+
+    snprintf(buffer, sizeof(buffer), "CAL DLY: %d\n",
+    static_cast<int>(*antenna_delay));
+
+    if (success_attempts <= 0) return;
+
+    auto mean_value_mm = distance_sum * 1000/ success_attempts;
+    auto error = abs(mean_value_mm - real_distance);
+
+    if (min_error > error) {
+        min_error = error;
+        distance_sum = 0;
+        best_antenna_delay = *antenna_delay;
+        std::snprintf(buffer, sizeof(buffer), "DLY:%d ERR:%d\n",
+                                                    static_cast<int>(*antenna_delay),
+                                                    static_cast<int>(min_error));
+    } else {
+        if (best_antenna_delay < *antenna_delay) {
+            add = -1;
+        }
+        if (best_antenna_delay == *antenna_delay) {
+            is_calibration = false;
+            std::snprintf(buffer, sizeof(buffer), "CAL DONE, DLY: %d\n",
+                                                    static_cast<int>(*antenna_delay));
+        }
+    }
+    success_attempts = 0;
+    *antenna_delay += add;
+    n_attempts = 0;
+    logger.log(buffer);
+
+    reset();
+}
+
 
 /**
  * Estimate the transmission time of a frame in uus
@@ -294,12 +354,3 @@ enum dwt_calibration_type: uint8_t {
     DWT_ANTENNA_RX_DELAY = 0,
     DWT_ANTENNA_TX_DELAY,
 };
-
-void DW1000::set_calibration(int id, uint16_t real_distance_mm) {
-    seeked_id = id;
-    real_distance = real_distance_mm;
-    is_calibration = true;
-    get_current_ant_delay();
-    *antenna_delay = 10000;
-    min_error = MAXFLOAT;
-}

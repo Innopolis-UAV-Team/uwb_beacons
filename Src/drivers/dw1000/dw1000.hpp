@@ -8,18 +8,18 @@
 #define SRC_DRIVERS_DW1000_DW1000_HPP_
 
 #include <string.h>
-#include "deca_device_api.h"
-#include "deca_regs.h"
-#include "deca_spi.h"
-#include "stm32f103xb.h"
+#include <deca_device_api.h>
+#include <deca_regs.h>
+#include <deca_spi.h>
+#include <stm32f103xb.h>
+#include <port.h>
 #include "../uart_logger/logger.hpp"
-#include "port.h"
 #include "common.hpp"
 
 #ifdef ANCHOR
-#define APP_NAME "Anchor V1.0"
+#define APP_NAME "Anchor V1.0\n"
 #else
-#define APP_NAME "Rover V2.0"
+#define APP_NAME "Rover V2.0\n"
 #endif
 
 /* Buffer to store received messages.
@@ -59,6 +59,8 @@ class DW1000 {
     int common_reset();
     int reset();
     int8_t read_message();
+    void calibrate(uint8_t anchor_id, float distance_mm);
+
     /* Hold copy of status register state here for reference so that it can be examined at a debug breakpoint. */
     static uint32_t status_reg;
     static uint8_t rx_buffer[RX_BUF_LEN];
@@ -73,7 +75,7 @@ class DW1000 {
     uint16_t seeked_id = 0;
     double min_error = MAXFLOAT;
     uint32_t best_antenna_delay;
-    antenna_delay_t antenna_delays = {TX_ANT_DLY, TX_ANT_DLY};
+    antenna_delay_t antenna_delays = {16566, 16566};
     uint16_t* antenna_delay = nullptr;
     void get_current_ant_delay();
     float seconds_to_dwt_s(float s) { return s * 512/499.2; }

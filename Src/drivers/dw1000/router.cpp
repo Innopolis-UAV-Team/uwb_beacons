@@ -28,7 +28,7 @@
 the enable of the receiver, as programmed for the DW1000's wait for response feature. */
 #define RESP_TX_TO_FINAL_RX_DLY_UUS 500
 /* Receive final timeout. See NOTE 5 below. */
-#define FINAL_RX_TIMEOUT_UUS 3000 // , , 3500, 4000, 4500, 5000, 5500, 6000, 7000 does not work
+#define FINAL_RX_TIMEOUT_UUS 5000  // , , 3500, 4000, 4500, 5000, 5500, 6000, 7000 does not work
 
 
 /* Hold copies of computed time of flight and distance here for
@@ -60,40 +60,9 @@ int DW1000::reset() {
 
 int8_t DW1000::spin() {
     static uint8_t anchor_id;
-    static double distance_sum = 0;
-    static uint16_t n_attempts = 0;
-    static uint16_t success_attempts = 0;
-    if (is_calibration && (anchor_id == seeked_id)) {
-        char buffer[UART_MAX_MESSAGE_LEN];
-        n_attempts++;
-        distance_sum += distance;
-        if (abs(distance) >= 0.01f) {
-            success_attempts++;
-        }
+    if (is_calibration)
+        calibrate(anchor_id, distance);
 
-        if (n_attempts > 100) {
-            snprintf(buffer, sizeof(buffer), "CAL DLY: %d\n",
-            static_cast<int>(*antenna_delay));
-            *antenna_delay += 10;
-            success_attempts = 0;
-            n_attempts = 0;
-            reset();
-            if (success_attempts >= 10) {
-                auto mean_value_mm = distance_sum * 1000/ success_attempts;
-                auto error = abs(mean_value_mm - real_distance);
-
-                if (min_error > error) {
-                    min_error = error;
-                    distance_sum = 0;
-                    best_antenna_delay = *antenna_delay;
-                    std::snprintf(buffer, sizeof(buffer), "DLY:%d ERR:%d\n",
-                                                                static_cast<int>(*antenna_delay),
-                                                                static_cast<int>(min_error));
-                }
-            }
-            logger.log(buffer);
-        }
-    }
     distance = 0;
     /* Clear reception timeout to start next ranging process. */
     dwt_setrxtimeout(0);
@@ -216,7 +185,7 @@ int8_t DW1000::spin() {
     tof_dtu = static_cast<int64>((Ra * Rb - Da * Db) / (Ra + Rb + Da + Db));
     tof = tof_dtu * DWT_TIME_UNITS;
     distance = tof * SPEED_OF_LIGHT;
-
+    if (is_calibration) return 0;
     if (distance < 0) {
         update_status(ModuleState::MODULE_IDLE);
         return -1;
@@ -232,7 +201,7 @@ int8_t DW1000::spin() {
     log_data[5] = 0xFF;
     log_data[6] = 0xFF;
     log_data[7] = 0xFF;
-    log_data[8] = 0;
+    log_data[8] = 0x55;
     logger.log(log_data, 9);
     last_success_time = HAL_GetTick();
     update_status(ModuleState::MODULE_OPERATIONAL);
