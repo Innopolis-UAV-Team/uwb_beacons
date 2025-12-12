@@ -18,3 +18,5 @@ if (USE_ANCHOR)
 else()
     add_definitions(-DROUTER)
 endif()
+
+include(${APPLICATION_DIR}/platform/${PLATFORM}/CMakeLists.txt)

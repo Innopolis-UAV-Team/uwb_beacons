@@ -1,18 +1,19 @@
 /**
  * This program is free software under the GNU General Public License v3.
  * See <https://www.gnu.org/licenses/> for details.
- * Author: Anastasiia Stepanova <asiiapine@gmail.com>
+ * Copyright 2025 Author: Anastasiia Stepanova <asiiapine@gmail.com>
 */
 
-#include <peripheral/usart/usart.h>
+#include "peripheral/usart/usart_manager.hpp"
+#include "peripheral/usart/usart_driver.h"
 #include <string.h>
+#include "peripheral/led/led.hpp"
 
-extern UART_HandleTypeDef huart1;
-MessagesCircularBuffer buffer = {0};
-uint8_t uart_tx_busy = 0;
-uint8_t last_id = 0;
+UsartManager usart_manager;
+MessagesCircularBuffer buffer;
+uint8_t UsartManager::tx_busy = 0;
 
-void push_message(UART_Message message) {
+void UsartManager::push_message(UART_Message message) {
     memcpy(&buffer.messages[buffer.next_id], &message, sizeof(UART_Message));
     buffer.next_id++;
     buffer.size++;
@@ -24,7 +25,7 @@ void push_message(UART_Message message) {
     }
 }
 
-void pop_last_message(UART_Message* message) {
+void UsartManager::pop_last_message(UART_Message* message) {
     if (buffer.size == 0) {
         message->len = 0;
         return;
@@ -38,7 +39,10 @@ void pop_last_message(UART_Message* message) {
     buffer.size--;
 }
 
-void usart_init() {
+void UsartManager::init() {
+    tx_busy = 0;
+    last_id = 0;
+
     buffer.size = 0;
     buffer.next_id = 0;
     for (int i = 0; i < UART_MAX_QUEUE_SIZE; i++) {
@@ -46,33 +50,32 @@ void usart_init() {
     }
 }
 
-void usart_send(uint8_t *data, uint16_t len) {
-    UART_Message message = {.len = len};
+void UsartManager::send(uint8_t *data, uint8_t len) {
+    UART_Message message = {.data = {0}, .len = len};
     memcpy(message.data, data, len);
     push_message(message);
 }
 
-void usart_run() {
-    if ((buffer.size == 0) || uart_tx_busy) {
+void UsartManager::run() {
+    if ((buffer.size == 0) || tx_busy) {
         return;
     }
     UART_Message message;
     pop_last_message(&message);
     if (message.len == 0) return;
-    uart_tx_busy++;
-    HAL_StatusTypeDef res = HAL_UART_Transmit_IT(&huart1, message.data, message.len);
+    tx_busy++;
+    int res = usart_send(message.data, message.len);
     if (res != HAL_OK) {
-        HAL_GPIO_TogglePin(GPIOA, LED1_Pin);
-        HAL_GPIO_WritePin(GPIOA, LED2_Pin, GPIO_PIN_RESET);
-        uart_tx_busy--;
+        led.toggle(LED_COLOR::RED);
+        led.off(LED_COLOR::BLUE);
+        tx_busy--;
         return;
     }
     memset(&buffer.messages[last_id], 0, sizeof(UART_Message));
-    HAL_GPIO_WritePin(GPIOA, LED1_Pin, GPIO_PIN_RESET);
+    led.off(LED_COLOR::RED);
 }
 
-void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
-    (void)huart;
-    uart_tx_busy--;
-    HAL_GPIO_TogglePin(GPIOA, LED2_Pin);
+void usart_tx_isr() {
+    UsartManager::tx_busy--;
+    led.toggle(LED_COLOR::BLUE);
 }

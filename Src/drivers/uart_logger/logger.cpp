@@ -6,9 +6,9 @@
 
 #include "logger.hpp"
 #include <string.h>
-#include <logs.h>
 
 Logger logger;
+extern UsartManager usart_manager;
 
 void logs(const char *s) {
     logger.log(s);
@@ -19,17 +19,17 @@ void logc(const uint8_t *s, uint16_t len) {
 }
 
 void Logger::init() {
-    usart_init();
+    usart_manager.init();
 }
 
 void Logger::log(const char* s) {
-    usart_send((uint8_t*)s, strlen(s));
+    usart_manager.send((uint8_t*)s, strlen(s));
 }
 
 void Logger::log(const uint8_t* s, uint16_t len) {
-    usart_send((uint8_t*)s, len);
+    usart_manager.send((uint8_t*)s, len);
 }
 
 void Logger::spin() {
-    usart_run();
+    usart_manager.run();
 }

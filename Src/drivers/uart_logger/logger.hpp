@@ -7,7 +7,7 @@
 #ifndef SRC_DRIVERS_UART_LOGGER_LOGGER_HPP_
 #define SRC_DRIVERS_UART_LOGGER_LOGGER_HPP_
 
-#include "peripheral/usart/usart.h"
+#include "peripheral/usart/usart_manager.hpp"
 
 class Logger {
  public:
