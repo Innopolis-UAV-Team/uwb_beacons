@@ -25,10 +25,10 @@ __attribute__((noreturn)) void application_entry_point() {
         dw1000.spin();
         if  (!dw1000.is_calibration) {
             if (dw1000.state == ModuleState::MODULE_ERROR) {
-                led.on(LED_COLOR::RED);
+                led.on(LED_COLOR::YELLOW);
                 continue;
             }
-            led.off(LED_COLOR::RED);
+            led.off(LED_COLOR::YELLOW);
         }
         HAL_IWDG_Refresh(&hiwdg);
     }
