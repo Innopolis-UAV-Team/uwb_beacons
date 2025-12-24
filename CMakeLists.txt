@@ -31,11 +31,10 @@ endif()
 
 if (TYPE STREQUAL "anchor")
     set(TARGET_NAME "anchor")
-    add_definitions(-DANCHOR)
+    set(USE_ANCHOR ON)
     message(STATUS "${Blue}ANCHOR type set${ColourReset}")
 else()
     set(TARGET_NAME "router")
-    add_definitions(-DROUTER)
     message(STATUS "${Yellow}ROUTER type set${ColourReset}")
 endif()
 
