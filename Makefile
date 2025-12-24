@@ -9,7 +9,7 @@ export CALIBRATE?=0
 export PLATFORM?=stm32
 
 # .DELETE_ON_ERROR:
-.PHONY: ubuntu calibrate
+.PHONY: ubuntu calibrate upload
 
 calibrate: CALIBRATE = 1
 calibrate:
