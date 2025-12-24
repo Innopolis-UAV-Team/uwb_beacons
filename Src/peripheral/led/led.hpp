@@ -11,7 +11,7 @@
 enum LED_COLOR {
     BLUE = 0,
     GREEN,
-    RED,
+    YELLOW,
     ALL
 };
 
