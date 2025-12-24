@@ -36,8 +36,6 @@ class DW1000 {
     ModuleState state;
     int init() {
         setup_DW1000RSTnIRQ(1);
-        /* Display application name on LCD. */
-        logger.log(APP_NAME);
         /* Reset and initialise DW1000.
          * For initialisation, DW1000 clocks must be temporarily set to crystal speed. After initialisation SPI rate can be increased for optimum
          * performance. */
