@@ -7,7 +7,7 @@
 #include "main.h"
 #include <stdio.h>
 #include <string.h>
-#include "peripheral/usart/usart_driver.h"
+#include "peripheral/usart/usart_driver.hpp"
 #include "application.hpp"
 
 
@@ -20,5 +20,9 @@ int usart_send(uint8_t *pData, uint16_t Size) {
 }
 
 __attribute__((weak)) void usart_tx_isr() {
+    return;
+}
+
+__attribute__((weak)) void usart_rx_isr() {
     return;
 }

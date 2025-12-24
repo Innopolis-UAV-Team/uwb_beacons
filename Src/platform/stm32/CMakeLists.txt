@@ -30,7 +30,7 @@ list(APPEND CUBE_MX_HEADERS
 
 add_executable(${EXECUTABLE}
     ${CMAKE_CURRENT_LIST_DIR}/led.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/usart_driver.c
+    ${CMAKE_CURRENT_LIST_DIR}/usart_driver.cpp
     ${coreSources}
     ${driversSources}
     ${startupFile}

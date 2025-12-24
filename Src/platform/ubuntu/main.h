@@ -18,6 +18,4 @@ enum GPIO_PinState: uint32_t {
     GPIO_PIN_SET = 1,
 };
 
-// extern "C" {
-//     void HAL_GPIO_WritePin(GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin, GPIO_PinState PinState);
-// }
+uint32_t HAL_GetTick();

@@ -5,55 +5,52 @@
 */
 
 #include "peripheral/usart/usart_manager.hpp"
-#include "peripheral/usart/usart_driver.h"
+#include "peripheral/usart/usart_driver.hpp"
 #include <string.h>
 #include "peripheral/led/led.hpp"
 
 UsartManager usart_manager;
 MessagesCircularBuffer buffer;
+MessagesCircularBuffer rx_buffer;
 uint8_t UsartManager::tx_busy = 0;
 
-void UsartManager::push_message(UART_Message message) {
-    memcpy(&buffer.messages[buffer.next_id], &message, sizeof(UART_Message));
-    buffer.next_id++;
-    buffer.size++;
-    if (buffer.next_id >= UART_MAX_QUEUE_SIZE) {
-        buffer.next_id = 0;
+void MessagesCircularBuffer::push_message(UART_Message message) {
+    memcpy(&messages[next_id], &message, sizeof(UART_Message));
+    next_id++;
+    size++;
+    if (next_id >= UART_MAX_QUEUE_SIZE) {
+        next_id = 0;
     }
-    if (buffer.size >= UART_MAX_QUEUE_SIZE) {
-        buffer.size = UART_MAX_QUEUE_SIZE;
+    if (size >= UART_MAX_QUEUE_SIZE) {
+        size = UART_MAX_QUEUE_SIZE;
     }
 }
 
-void UsartManager::pop_last_message(UART_Message* message) {
-    if (buffer.size == 0) {
+void MessagesCircularBuffer::pop_last_message(UART_Message* message) {
+    if (size == 0) {
         message->len = 0;
         return;
     }
-    if (buffer.next_id < buffer.size) {
-        last_id = UART_MAX_QUEUE_SIZE - buffer.size + buffer.next_id;
+    if (next_id < size) {
+        head_id = UART_MAX_QUEUE_SIZE - size + next_id;
     } else {
-        last_id = buffer.next_id - buffer.size;
+        head_id = next_id - size;
     }
-    *message = buffer.messages[last_id];
-    buffer.size--;
+    *message = messages[head_id];
+    size--;
 }
 
 void UsartManager::init() {
     tx_busy = 0;
-    last_id = 0;
-
-    buffer.size = 0;
-    buffer.next_id = 0;
     for (int i = 0; i < UART_MAX_QUEUE_SIZE; i++) {
-        memset(&buffer.messages[i], 0, sizeof(UART_Message));
+        memset(&buffer.messages[i].buffer.data, 0, sizeof(UART_Message));
     }
 }
 
 void UsartManager::send(uint8_t *data, uint8_t len) {
-    UART_Message message = {.data = {0}, .len = len};
-    memcpy(message.data, data, len);
-    push_message(message);
+    UART_Message message = {.buffer = {0}, .len = len};
+    memcpy(message.buffer.data, data, len);
+    buffer.push_message(message);
 }
 
 void UsartManager::run() {
@@ -61,21 +58,26 @@ void UsartManager::run() {
         return;
     }
     UART_Message message;
-    pop_last_message(&message);
+    buffer.pop_last_message(&message);
     if (message.len == 0) return;
     tx_busy++;
-    int res = usart_send(message.data, message.len);
+    int res = HAL::usart_send(message.buffer.data, message.len);
     if (res != HAL_OK) {
-        led.toggle(LED_COLOR::RED);
+        led.toggle(LED_COLOR::YELLOW);
         led.off(LED_COLOR::BLUE);
         tx_busy--;
         return;
     }
-    memset(&buffer.messages[last_id], 0, sizeof(UART_Message));
-    led.off(LED_COLOR::RED);
+    memset(&buffer.messages[buffer.head_id].buffer.data, 0, sizeof(UART_Message));
+    led.off(LED_COLOR::YELLOW);
 }
 
-void usart_tx_isr() {
+void HAL::usart_tx_isr() {
     UsartManager::tx_busy--;
     led.toggle(LED_COLOR::BLUE);
+}
+
+void HAL::usart_rx_isr() {
+    // rx_buffer.push_message(message);
+    buffer.push_message(usart_rx_buffer);
 }

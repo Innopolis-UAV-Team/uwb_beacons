@@ -10,20 +10,19 @@
 
 #include <stdint.h>
 #include <main.h>
+#include "peripheral/usart/usart_driver.hpp"
 
 #define UART_MAX_QUEUE_SIZE 15
-#define UART_MAX_MESSAGE_LEN 40
 
-typedef struct {
-    uint8_t data[UART_MAX_MESSAGE_LEN];
-    uint8_t len;
-} UART_Message;
-
-typedef struct {
-    uint8_t size;
+class MessagesCircularBuffer {
     uint8_t next_id;  // tail, next free position
+ public:
+    uint8_t head_id;
+    uint8_t size;
     UART_Message messages[UART_MAX_QUEUE_SIZE];
-} MessagesCircularBuffer;
+    void pop_last_message(UART_Message* message);
+    void push_message(UART_Message message);
+};
 
 
 class UsartManager {
@@ -34,8 +33,6 @@ class UsartManager {
     static uint8_t tx_busy;
  private:
     uint8_t last_id;
-    void pop_last_message(UART_Message* message);
-    void push_message(UART_Message message);
 };
 
 extern UsartManager usart_manager;
