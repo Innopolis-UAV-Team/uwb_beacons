@@ -12,7 +12,8 @@ UART_Message usart_rx_buffer = {};
 UART_Message usart_tx_buffer = {};
 
 int HAL::usart_send(uint8_t *data, uint16_t len) {
-    HAL_StatusTypeDef res = HAL_UART_Transmit_IT(&huart1, data, len);
+    HAL_StatusTypeDef res = HAL_UART_Transmit(&huart1, data, len, 100);
+    HAL::usart_rx_isr();
     return res;
 }
 
