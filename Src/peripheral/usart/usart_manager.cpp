@@ -47,9 +47,15 @@ void UsartManager::init() {
     }
 }
 
-void UsartManager::send(uint8_t *data, uint8_t len) {
+void UsartManager::send(const uint8_t *data, uint8_t len) {
     UART_Message message = {.buffer = {0}, .len = len};
     memcpy(message.buffer.data, data, len);
+    buffer.push_message(message);
+}
+
+void UsartManager::send(const char *data, uint8_t len) {
+    UART_Message message = {.buffer = {0}, .len = len};
+    memcpy(message.buffer.str, data, len);
     buffer.push_message(message);
 }
 
@@ -68,11 +74,11 @@ void UsartManager::run() {
         tx_busy--;
         return;
     }
-    memset(&buffer.messages[buffer.head_id].buffer.data, 0, sizeof(UART_Message));
     led.off(LED_COLOR::YELLOW);
 }
 
 void HAL::usart_tx_isr() {
+    memset(&buffer.messages[buffer.head_id].buffer.data, 0, sizeof(UART_Message));
     UsartManager::tx_busy--;
     led.toggle(LED_COLOR::BLUE);
 }

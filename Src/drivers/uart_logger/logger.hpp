@@ -13,6 +13,7 @@ class Logger {
  public:
     void init();
     void log(const char* s);
+    void log(const char* s, uint16_t len);
     void log(const uint8_t* s, uint16_t len);
     void spin();
 };

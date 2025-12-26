@@ -28,7 +28,8 @@ class MessagesCircularBuffer {
 class UsartManager {
  public:
     void init();
-    void send(uint8_t *data, uint8_t len);
+    void send(const uint8_t *data, uint8_t len);
+    void send(const char *data, uint8_t len);
     void run();
     static uint8_t tx_busy;
  private:

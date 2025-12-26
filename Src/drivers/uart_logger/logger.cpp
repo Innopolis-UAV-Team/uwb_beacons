@@ -22,12 +22,16 @@ void Logger::init() {
     usart_manager.init();
 }
 
+void Logger::log(const char* s, uint16_t len) {
+    usart_manager.send(s, len);
+}
+
 void Logger::log(const char* s) {
-    usart_manager.send((uint8_t*)s, strlen(s));
+    usart_manager.send(s, strlen(s));
 }
 
 void Logger::log(const uint8_t* s, uint16_t len) {
-    usart_manager.send((uint8_t*)s, len);
+    usart_manager.send(s, len);
 }
 
 void Logger::spin() {
