@@ -6,25 +6,30 @@
 #ifndef SRC_DRIVERS_DW1000_COMMON_HPP_
 #define SRC_DRIVERS_DW1000_COMMON_HPP_
 
-#include "dw1000.hpp"
-#include "../uart_logger/logger.hpp"
+#include <stdint.h>
 
 /* Define the global dw1000 object */
-extern DW1000 dw1000;
 #define SOURCE_ID_IND           8
 #define DEST_ID_IND             6
 #define MSG_TYPE_IND 9
+
+struct antenna_delay_t {
+    uint16_t tx_rx_prf_64;
+    uint16_t tx_rx_prf_16;
+};
 
 /* Speed of light in air, in metres per second. */
 #define SPEED_OF_LIGHT 299702547
 
 #define UUS_TO_DWT_TIME 65536
 /* Preamble timeout, in multiple of PAC size. See NOTE 6 below. */
-#define PRE_TIMEOUT 8
+#define PRE_TIMEOUT 20
 
 /* Default antenna delay values for 64 MHz PRF. See NOTE 1 below. */
+// #define TX_ANT_DLY 32872
 #define TX_ANT_DLY 16436
 #define RX_ANT_DLY 16436
+// #define RX_ANT_DLY 32872
 
 #define ALL_MSG_COMMON_LEN 10
 /* Index to access some of the fields in the frames involved in the process. */
@@ -34,15 +39,6 @@ extern DW1000 dw1000;
 #define FINAL_MSG_FINAL_TX_TS_IDX 18
 #define FINAL_MSG_TS_LEN 4
 #define RNG_DELAY_MS 100
-
-/* Default communication configuration. We use here EVK1000's default mode (mode 3). */
-extern dwt_config_t dw_config;
-
-extern uint8_t poll_msg[12];
-extern uint8_t resp_msg[15];
-extern uint8_t final_msg[24];
-
-/* Static member definitions - these will be defined in dw1000.cpp */
 
 /* Declaration of static functions. */
 uint64_t get_tx_timestamp_u64(void);

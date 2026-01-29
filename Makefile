@@ -5,6 +5,19 @@ BUILD_DIR:=$(ROOT_DIR)/build
 ID ?= 1  # You can provide a default ID if needed
 TARGET?=anchor
 BAUDRATE?=230400
+export CALIBRATE?=0
+export PLATFORM?=stm32
+
+# .DELETE_ON_ERROR:
+.PHONY: ubuntu calibrate upload
+
+calibrate: CALIBRATE = 1
+calibrate:
+	@echo "Calibrating"
+
+ubuntu: PLATFORM = ubuntu
+ubuntu:
+	@echo "Building on Ubuntu"
 
 anchor-upload: anchor
 	$(MAKE) TARGET=anchor upload
@@ -12,15 +25,12 @@ anchor-upload: anchor
 router-upload: router
 	$(MAKE) TARGET=router upload
 
-anchor: 
-	rm -fR ${BUILD_DIR}/anchor
-	mkdir -p ${BUILD_DIR}/anchor/obj
-	cd ${BUILD_DIR}/anchor && cmake -G "Unix Makefiles" -DUSE_ANCHOR=ON -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DBAUDRATE=${BAUDRATE} -DID=${ID} ../.. && make
-
-router:
-	rm -fR ${BUILD_DIR}/router
-	mkdir -p ${BUILD_DIR}/router/obj
-	cd ${BUILD_DIR}/router && cmake -G "Unix Makefiles" -DUSE_ANCHOR=OFF -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DBAUDRATE=${BAUDRATE} -DID=${ID} ../.. && make
+# calibration is not implemented for anchor yet
+anchor router:
+	@echo "Building $@"
+	rm -fR ${BUILD_DIR}/$@
+	mkdir -p ${BUILD_DIR}/$@/obj
+	cd ${BUILD_DIR}/$@ && cmake -G "Unix Makefiles" -DTYPE=$@ -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DBAUDRATE=${BAUDRATE} -DCALIBRATE=${CALIBRATE} -DID=${ID} -DPLATFORM=${PLATFORM} ../.. && make
 
 upload:
 	st-flash write ${BUILD_DIR}/$(TARGET)/obj/${TARGET}.bin 0x08000000

@@ -8,26 +8,27 @@
 #include "application.hpp"
 #include "drivers/dw1000/dw1000.hpp"
 #include "drivers/uart_logger/logger.hpp"
+#include "peripheral/led/led.hpp"
 
 extern IWDG_HandleTypeDef hiwdg;
 
 __attribute__((noreturn)) void application_entry_point() {
     logger.init();
-    if (dw1000.init() != 0) {
-        logger.log("INIT FAILED");
-        while (true) {
-            logger.spin();
-            HAL_GPIO_TogglePin(GPIOA, LED1_Pin);
-            HAL_Delay(1000);
-        }
+    if (CALIBRATE) {
+        dw1000.set_calibration(4, 7000);  // id, distance in mm
     }
+    dw1000.init();
 
-    HAL_GPIO_WritePin(GPIOA, LED1_Pin, GPIO_PIN_SET);
+    led.off(LED_COLOR::ALL);
     while (true) {
-        HAL_GPIO_TogglePin(GPIOA, LED2_Pin);
         logger.spin();
-        if (dw1000.spin() != 0) {
-            continue;
+        dw1000.spin();
+        if  (!dw1000.is_calibration) {
+            if (dw1000.state == ModuleState::MODULE_ERROR) {
+                led.on(LED_COLOR::YELLOW);
+                continue;
+            }
+            led.off(LED_COLOR::YELLOW);
         }
         HAL_IWDG_Refresh(&hiwdg);
     }

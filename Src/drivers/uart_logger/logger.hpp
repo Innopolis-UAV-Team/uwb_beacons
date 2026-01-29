@@ -7,12 +7,13 @@
 #ifndef SRC_DRIVERS_UART_LOGGER_LOGGER_HPP_
 #define SRC_DRIVERS_UART_LOGGER_LOGGER_HPP_
 
-#include <peripheral/usart/usart.h>
+#include "peripheral/usart/usart_manager.hpp"
 
 class Logger {
  public:
     void init();
     void log(const char* s);
+    void log(const char* s, uint16_t len);
     void log(const uint8_t* s, uint16_t len);
     void spin();
 };

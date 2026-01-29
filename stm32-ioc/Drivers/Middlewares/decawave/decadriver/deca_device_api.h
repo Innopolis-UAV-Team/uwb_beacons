@@ -121,6 +121,8 @@ typedef signed long int32;
 #define DWT_LEDS_DISABLE     0x00
 #define DWT_LEDS_ENABLE      0x01
 #define DWT_LEDS_INIT_BLINK  0x02
+#define DWT_LEDS_RXTXOK      0x05
+#define DWT_LEDS_SFD         0x09
 
 // Defined constants for "lna_pa" bit field parameter passed to dwt_setlnapamode() function
 #define DWT_LNA_PA_DISABLE     0x00

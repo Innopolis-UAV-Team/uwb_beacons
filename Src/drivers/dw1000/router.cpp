@@ -5,11 +5,12 @@
 */
 
 #include <stdio.h>
-#include <Multilateration.h>
 #include "dw1000.hpp"
 #include "common.hpp"
 #include "../uart_logger/logger.hpp"
 #include <cstdio>
+#include <cstring>
+#include <logs.h>
 
 
 /* Index to access some of the fields in the frames involved in the process. */
@@ -22,12 +23,12 @@
 /* Delay between frames, in UWB microseconds. See NOTE 4 below. */
 /* This is the delay from Frame RX timestamp to TX reply timestamp used for calculating/setting the DW1000's delayed TX function. This includes the
  * frame length of approximately 2.46 ms with above configuration. */
-#define POLL_RX_TO_RESP_TX_DLY_UUS 2750
+#define POLL_RX_TO_RESP_TX_DLY_UUS 5000
 /* This is the delay from the end of the frame transmission to
 the enable of the receiver, as programmed for the DW1000's wait for response feature. */
 #define RESP_TX_TO_FINAL_RX_DLY_UUS 500
 /* Receive final timeout. See NOTE 5 below. */
-#define FINAL_RX_TIMEOUT_UUS 3300
+#define FINAL_RX_TIMEOUT_UUS 5000  // , , 3500, 4000, 4500, 5000, 5500, 6000, 7000 does not work
 
 
 /* Hold copies of computed time of flight and distance here for
@@ -46,6 +47,8 @@ static uint8_t tx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 0x00, 'W', ID, 0
 static uint8_t rx_final_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', ID, 'V', 0x00, 0x23, 0,
                                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
+extern UART_HandleTypeDef huart1;
+uint8_t data[50] = {0};
 
 int DW1000::reset() {
     if (common_reset() != 0) return -1;
@@ -56,29 +59,27 @@ int DW1000::reset() {
 }
 
 int8_t DW1000::spin() {
+    static uint8_t anchor_id;
+    if (is_calibration)
+        calibrate(anchor_id, distance);
+
+    distance = 0;
     /* Clear reception timeout to start next ranging process. */
     dwt_setrxtimeout(0);
 
     /* Activate reception immediately. */
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
-    /* Poll for reception of a frame or error/timeout. */
-    while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) &
-            (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {}
-    if (!(status_reg & SYS_STATUS_RXFCG)) {
-        /* Clear RX error/timeout events in the DW1000 status register. */
-        dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
-        /* Reset RX to properly reinitialise LDE operation. */
-        dwt_rxreset();
-        return -1;
-    }
     bool got_poll = false;
     uint8_t n_tries = 0;
-    while((!got_poll) & (n_tries < 5)) {
+    while ((!got_poll) & (n_tries < 3)) {
+        n_tries++;
+
         if (read_message() != 0) {
+            /* Activate reception immediately. */
+            dwt_rxenable(DWT_START_RX_IMMEDIATE);
             continue;
         }
-        n_tries++;
 
         if (rx_buffer[MSG_TYPE_IND] != 0x21) {
             continue;
@@ -87,6 +88,7 @@ int8_t DW1000::spin() {
     }
 
     if (!got_poll) {
+        update_status(ModuleState::MODULE_IDLE);
         return -1;
     }
 
@@ -94,13 +96,14 @@ int8_t DW1000::spin() {
 
     /* Check that the frame is a poll sent by which anchor.
         * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
-    uint8_t anchor_id = rx_buffer[SOURCE_ID_IND];
+    anchor_id = rx_buffer[SOURCE_ID_IND];
     rx_poll_msg[SOURCE_ID_IND] = anchor_id;
     tx_resp_msg[DEST_ID_IND] = anchor_id;
     rx_final_msg[SOURCE_ID_IND] = anchor_id;
     if (memcmp(rx_buffer, rx_poll_msg, ALL_MSG_COMMON_LEN) != 0) {
         return -1;
     }
+    memset(&rx_buffer, 0, sizeof(rx_buffer));
     uint32_t resp_tx_time;
     int ret;
 
@@ -124,7 +127,7 @@ int8_t DW1000::spin() {
     /* If dwt_starttx() returns an error, abandon this ranging exchange
     and proceed to the next one. See NOTE 11 below. */
     if (ret == DWT_ERROR) {
-        logs("F\n");
+        update_status(ModuleState::MODULE_ERROR);
         return -1;
     }
 
@@ -134,11 +137,15 @@ int8_t DW1000::spin() {
     /* Try to read the final message 10 times */
     n_tries = 0;
     bool got_final = false;
+    status_reg = dwt_read32bitreg(SYS_STATUS_ID);
+
     while ((!got_final) & (n_tries < 5)) {
+        n_tries++;
         if (read_message() != 0) {
+            /* Activate reception immediately. */
+            dwt_rxenable(DWT_START_RX_IMMEDIATE);
             continue;
         }
-        n_tries++;
         if (rx_buffer[MSG_TYPE_IND] != 0x23) {
             continue;
         }
@@ -149,6 +156,7 @@ int8_t DW1000::spin() {
     }
 
     if (!got_final) {
+        update_status(ModuleState::MODULE_ERROR);
         return -1;
     }
 
@@ -167,22 +175,24 @@ int8_t DW1000::spin() {
     final_msg_get_ts(&rx_buffer[FINAL_MSG_FINAL_TX_TS_IDX], &final_tx_ts);
 
     /* Compute time of flight. 32-bit subtractions give correct answers even if clock has wrapped. See NOTE 12 below. */
-    poll_rx_ts_32 = (uint32_t)poll_rx_ts;
-    resp_tx_ts_32 = (uint32_t)resp_tx_ts;
-    final_rx_ts_32 = (uint32_t)final_rx_ts;
-    Ra = (double)(resp_rx_ts - poll_tx_ts);
-    Rb = (double)(final_rx_ts_32 - resp_tx_ts_32);
-    Da = (double)(final_tx_ts - resp_rx_ts);
-    Db = (double)(resp_tx_ts_32 - poll_rx_ts_32);
-    tof_dtu = (int64)((Ra * Rb - Da * Db) / (Ra + Rb + Da + Db));
+    poll_rx_ts_32 = static_cast<uint32_t>(poll_rx_ts);
+    resp_tx_ts_32 = static_cast<uint32_t>(resp_tx_ts);
+    final_rx_ts_32 = static_cast<uint32_t>(final_rx_ts);
+    Ra = static_cast<double>(resp_rx_ts - poll_tx_ts);
+    Rb = static_cast<double>(final_rx_ts_32 - resp_tx_ts_32);
+    Da = static_cast<double>(resp_tx_ts_32 - poll_rx_ts_32);
+    Db = static_cast<double>(final_tx_ts - resp_rx_ts);
+    tof_dtu = static_cast<int64>((Ra * Rb - Da * Db) / (Ra + Rb + Da + Db));
     tof = tof_dtu * DWT_TIME_UNITS;
     distance = tof * SPEED_OF_LIGHT;
+    if (is_calibration) return 0;
     if (distance < 0) {
+        update_status(ModuleState::MODULE_IDLE);
         return -1;
     }
 
     /* Display computed distance on LCD. */
-    uint32_t dist = uint32_t(int(distance * 1000));
+    uint32_t dist = static_cast<uint32_t>(distance * 1000);
     log_data[0] = anchor_id;
     log_data[1] =  dist & 0xFF;
     log_data[2] = (dist >> 8) & 0xFF;
@@ -191,7 +201,21 @@ int8_t DW1000::spin() {
     log_data[5] = 0xFF;
     log_data[6] = 0xFF;
     log_data[7] = 0xFF;
-    log_data[8] = 0;
-    logc(log_data, 9);
+    log_data[8] = 0x55;
+    logger.log(log_data, 9);
+    last_success_time = HAL_GetTick();
+    update_status(ModuleState::MODULE_OPERATIONAL);
+
     return 0;
 }
+
+/**
+ * NOTES:
+ * 
+ * 9. Timestamps and delayed transmission time are both expressed in device time units so
+ *    we just have to add the desired response delay to poll RX timestamp to get response
+ *    transmission time. The delayed transmission time resolution is 512 device time units
+ *    which means that the lower 9 bits of the obtained value must be zeroed.
+ *    This also allows to encode the 40-bit value in a 32-bit words by shifting the all-zero
+ *    lower 8 bits.
+ */

@@ -2591,9 +2591,20 @@ void dwt_setleds(uint8 mode)
     {
         // Set up MFIO for LED output.
         reg = dwt_read32bitoffsetreg(GPIO_CTRL_ID, GPIO_MODE_OFFSET);
-        reg &= ~(GPIO_MSGP2_MASK | GPIO_MSGP3_MASK);
-        reg |= (GPIO_PIN2_RXLED | GPIO_PIN3_TXLED);
-        dwt_write32bitoffsetreg(GPIO_CTRL_ID, GPIO_MODE_OFFSET, reg);
+        uint32 mask = GPIO_MSGP2_MASK | GPIO_MSGP3_MASK;
+        uint32 val = GPIO_PIN2_RXLED | GPIO_PIN3_TXLED;
+        if (mode & DWT_LEDS_RXTXOK) {
+            mask |= GPIO_MSGP0_MASK;
+            val |= GPIO_PIN0_RXOKLED;
+        }
+        if (mode & DWT_LEDS_SFD) {
+            mask |= GPIO_MSGP1_MASK;
+            val |= GPIO_PIN1_SFDLED;
+        }
+
+        reg &= ~(mask);  // 3724541952
+        reg |= val;  // 3724541952
+        dwt_write32bitoffsetreg(GPIO_CTRL_ID, GPIO_MODE_OFFSET, reg); // 3724547072
 
         // Enable LP Oscillator to run from counter and turn on de-bounce clock.
         reg = dwt_read32bitoffsetreg(PMSC_ID, PMSC_CTRL0_OFFSET);

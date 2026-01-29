@@ -3,6 +3,7 @@
  * See <https://www.gnu.org/licenses/> for details.
  * Author: Anastasiia Stepanova <asiiapine@gmail.com>
 */
+#include <cstdio>
 #include "dw1000.hpp"
 #include "common.hpp"
 
@@ -13,29 +14,36 @@ DW1000 dw1000;
 dwt_config_t dw_config = {
     2,               /* Channel number. */
     DWT_PRF_64M,     /* Pulse repetition frequency. */
-    DWT_PLEN_1024,   /* Preamble length. Used in TX only. */
-    DWT_PAC32,       /* Preamble acquisition chunk size. Used in RX only. */
+    DWT_PLEN_2048,   /* Preamble length. Used in TX only. */
+    DWT_PAC64,       /* Preamble acquisition chunk size. Used in RX only. */
     9,               /* TX preamble code. Used in TX only. */
     9,               /* RX preamble code. Used in RX only. */
     1,               /* 0 to use standard SFD, 1 to use non-standard SFD. */
     DWT_BR_110K,     /* Data rate. */
     DWT_PHRMODE_STD, /* PHY header mode. */
-    (1025 + 64 - 32) /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
+    (2048 + 1 + 64 - 64) /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
 };
-
-uint8_t poll_msg[12] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 0x00, 0x21, 0, 0};
-uint8_t resp_msg[15] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 0x00, 'W', 'A', 0x10, 0x02, 0, 0, 0, 0};
-uint8_t final_msg[24] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 0x00, 0x23, 0, 0,
-                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 /* Static member definitions */
 uint32_t DW1000::status_reg = 0;
 uint8_t DW1000::frame_seq_nb = 0;
 uint8_t DW1000::rx_buffer[RX_BUF_LEN] = {};
+extern UART_HandleTypeDef huart1;
+extern SPI_HandleTypeDef hspi1;
 
 int8_t DW1000::read_message() {
+    uint32_t start_time = HAL_GetTick();
+    // Poll for reception of a frame or error/timeout.
+    if (HAL_SPI_GetState(&hspi1) != HAL_SPI_STATE_READY) {
+        return -1;
+    }
     while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) &
-                (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {}
+                (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {
+        if (HAL_GetTick() - start_time > 20) {
+            break;
+        }
+        HAL_Delay(1);
+    }
 
     if (!(status_reg & SYS_STATUS_RXFCG)) {
         /* Clear RX error/timeout events in the DW1000 status register. */
@@ -50,7 +58,7 @@ int8_t DW1000::read_message() {
 
     /* A frame has been received, read it into the local buffer. */
     uint32_t frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFL_MASK_1023;
-    if (frame_len <= RX_BUFFER_LEN) {
+    if (frame_len <= sizeof(rx_buffer)) {
         dwt_readrxdata(rx_buffer, frame_len, 0);
         return 0;
     }
@@ -59,23 +67,206 @@ int8_t DW1000::read_message() {
 
 int DW1000::common_reset() {
     reset_DW1000(); /* Target specific drive of RSTn line into DW1000 low for a period. */
+    get_current_ant_delay();
+
     port_set_dw1000_slowrate();
     if (dwt_initialise(DWT_LOADUCODE) == DWT_ERROR) {
         logger.log("INIT FAILED");
         return -1;
     }
-    logger.log("INIT SUCCESS");
+    // logger.log("RESET\n");
     port_set_dw1000_fastrate();
 
     /* Configure DW1000. See NOTE 7 below. */
     dwt_configure(&dw_config);
+    dwt_configurefor64plen(dw_config.prf);
+    dwt_setleds(DWT_LEDS_RXTXOK | DWT_LEDS_SFD);
+
+    if (!is_calibration) {
+        *antenna_delay = TX_ANT_DLY;
+    } else {
+        char buffer[50];
+
+        if (((*antenna_delay) > 17000) & (min_error > 0)) {
+            *antenna_delay = best_antenna_delay;
+            snprintf(buffer, sizeof(buffer), "BEST DLY:%d ERR:%d\n",
+                                                        static_cast<int>(best_antenna_delay),
+                                                        static_cast<int>(min_error));
+            logger.log(buffer);
+            is_calibration = false;
+        }
+        snprintf(buffer, sizeof(buffer), "CAL DLY:%d\n", static_cast<int>(*antenna_delay));
+        logger.log(buffer);
+    }
 
     /* Apply default antenna delay value. See NOTE 1 below. */
-    dwt_setrxantennadelay(RX_ANT_DLY);
-    dwt_settxantennadelay(TX_ANT_DLY);
+    dwt_setrxantennadelay(*antenna_delay);
+    dwt_settxantennadelay(*antenna_delay);
     return 0;
 }
 
+void DW1000::set_calibration(int id, uint16_t real_distance_mm) {
+    seeked_id = id;
+    real_distance = real_distance_mm;
+    is_calibration = true;
+    get_current_ant_delay();
+    *antenna_delay = TX_ANT_DLY - 100;
+    min_error = MAXFLOAT;
+}
+
+void DW1000::calibrate(uint8_t anchor_id, float distance_mm) {
+    static double distance_sum = 0;
+    static uint16_t n_attempts = 0;
+    static uint16_t success_attempts = 0;
+    int add = 10;
+    if (anchor_id != seeked_id) {
+        return;
+    }
+    char buffer[UART_MAX_MESSAGE_LEN] = {0};
+    n_attempts++;
+    distance_sum += distance_mm;
+    if (abs(distance_mm) >= 0.01f) {
+        success_attempts++;
+    }
+
+    if (n_attempts < 1000) return;
+
+    snprintf(buffer, sizeof(buffer), "CAL DLY: %d\n",
+    static_cast<int>(*antenna_delay));
+
+    if (success_attempts <= 0) return;
+
+    auto mean_value_mm = distance_sum * 1000/ success_attempts;
+    auto error = abs(mean_value_mm - real_distance);
+
+    if (min_error > error) {
+        min_error = error;
+        distance_sum = 0;
+        best_antenna_delay = *antenna_delay;
+        std::snprintf(buffer, sizeof(buffer), "DLY:%d ERR:%d\n",
+                                                    static_cast<int>(*antenna_delay),
+                                                    static_cast<int>(min_error));
+    } else {
+        if (best_antenna_delay < *antenna_delay) {
+            add = -1;
+        }
+        if (best_antenna_delay == *antenna_delay) {
+            is_calibration = false;
+            std::snprintf(buffer, sizeof(buffer), "CAL DONE, DLY: %d\n",
+                                                    static_cast<int>(*antenna_delay));
+        }
+    }
+    success_attempts = 0;
+    *antenna_delay += add;
+    n_attempts = 0;
+    logger.log(buffer);
+
+    reset();
+}
+
+
+/**
+ * Estimate the transmission time of a frame in uus
+ * Author: tomlankhorst 2016 https://tomlankhorst.nl/estimating-decawave-dw1000-tx-time/
+ * dwt_config_t   dwt_config  Configuration struct of the DW1000
+ * uint16_t       framelength Framelength including the 2-Byte CRC
+ * bool           only_rmarker Option to compute only the time to the RMARKER (SHR time)
+ */
+int DW1000::dwt_estimate_tx_time(uint16_t framelength, bool only_rmarker) {
+    int32_t tx_time;
+    size_t sym_timing_ind;
+    uint16_t shr_len;
+
+    const uint16_t DATA_BLOCK_SIZE  = 330;
+    const uint16_t REED_SOLOM_BITS  = 48;
+
+    // Symbol timing LUT
+    const size_t SYM_TIM_16MHZ = 0;
+    const size_t SYM_TIM_64MHZ = 9;
+    const size_t SYM_TIM_110K  = 0;
+    const size_t SYM_TIM_850K  = 3;
+    const size_t SYM_TIM_6M8   = 6;
+    const size_t SYM_TIM_SHR   = 0;
+    const size_t SYM_TIM_PHR   = 1;
+    const size_t SYM_TIM_DAT   = 2;
+
+    static const uint16_t SYM_TIM_LUT[] = {
+        // 16 Mhz PRF
+        994, 8206, 8206,   // 0.11 Mbps
+        994, 1026, 1026,   // 0.85 Mbps
+        994, 1026, 129,    // 6.81 Mbps
+        // 64 Mhz PRF
+        1018, 8206, 8206,  // 0.11 Mbps
+        1018, 1026, 1026,  // 0.85 Mbps
+        1018, 1026, 129    // 6.81 Mbps
+    };
+
+    // Find the PHR
+    switch (dw_config.prf) {
+        case DWT_PRF_16M:  sym_timing_ind = SYM_TIM_16MHZ; break;
+        case DWT_PRF_64M:  sym_timing_ind = SYM_TIM_64MHZ; break;
+        default: return -1.0f;  // Invalid PRF
+    }
+
+    // Find the preamble length
+    switch (dw_config.txPreambLength) {
+        case DWT_PLEN_64:   shr_len = 64;    break;
+        case DWT_PLEN_128:  shr_len = 128;   break;
+        case DWT_PLEN_256:  shr_len = 256;   break;
+        case DWT_PLEN_512:  shr_len = 512;   break;
+        case DWT_PLEN_1024: shr_len = 1024;  break;
+        case DWT_PLEN_1536: shr_len = 1536;  break;
+        case DWT_PLEN_2048: shr_len = 2048;  break;
+        case DWT_PLEN_4096: shr_len = 4096;  break;
+        default: return -1.0f;  // Invalid preamble length
+    }
+
+    // Find the datarate
+    switch (dw_config.dataRate) {
+        case DWT_BR_110K:
+            sym_timing_ind  += SYM_TIM_110K;
+            shr_len         += 64;  // SFD 64 symbols
+            break;
+        case DWT_BR_850K:
+            sym_timing_ind  += SYM_TIM_850K;
+            shr_len         += 8;   // SFD 8 symbols
+            break;
+        case DWT_BR_6M8:
+            sym_timing_ind  += SYM_TIM_6M8;
+            shr_len         += 8;   // SFD 8 symbols
+            break;
+        default: return -1.0f;  // Invalid bitrate
+    }
+
+    // Add the SHR time
+    tx_time   = shr_len * SYM_TIM_LUT[ sym_timing_ind + SYM_TIM_SHR ];
+
+    // If not only RMARKER, calculate PHR and data
+    if (!only_rmarker) {
+        // Add the PHR time (21 bits)
+        tx_time  += 21 * SYM_TIM_LUT[ sym_timing_ind + SYM_TIM_PHR ];
+
+        // Bytes to bits
+        framelength *= 8;
+
+        // Add Reed-Solomon parity bits
+        framelength += REED_SOLOM_BITS * (framelength + DATA_BLOCK_SIZE - 1) / DATA_BLOCK_SIZE;
+
+        // Add the DAT time
+        tx_time += framelength * SYM_TIM_LUT[ sym_timing_ind + SYM_TIM_DAT ];
+    }
+
+    // Return float seconds
+    return seconds_to_dwt_s(tx_time);
+}
+
+void DW1000::get_current_ant_delay() {
+    if (dw_config.prf == DWT_PRF_64M) {
+        antenna_delay = &antenna_delays.tx_rx_prf_64;
+        return;
+    }
+    antenna_delay = &antenna_delays.tx_rx_prf_16;
+}
 
 /*
  * @fn final_msg_get_ts()
@@ -158,3 +349,8 @@ uint64_t get_rx_timestamp_u64(void) {
     }
     return ts;
 }
+
+enum dwt_calibration_type: uint8_t {
+    DWT_ANTENNA_RX_DELAY = 0,
+    DWT_ANTENNA_TX_DELAY,
+};
