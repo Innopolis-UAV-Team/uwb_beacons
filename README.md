@@ -74,6 +74,3 @@ The format of the statistics file is:
 # Data parsing
 
 To parse the messages use Message class from the [common folder](test/common/serial_messages.py)
-
-> [!NOTE]
-> The baudrate which is set by user in the software will be doubled because of some error in the hardware/clock configuration.
